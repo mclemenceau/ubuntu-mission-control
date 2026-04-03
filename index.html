@@ -280,6 +280,88 @@
       margin-right: 0 !important;
     }
     .p-navigation__banner { padding-left: 25px !important; }
+
+    /* ── Version history panel ─────────────────────────────────── */
+    .version-panel {
+      width: 0;
+      min-width: 0;
+      overflow: hidden;
+      border-left: 1px solid #cdcdcd;
+      background: #fafafa;
+      display: flex;
+      flex-direction: column;
+      transition: width 0.2s ease, min-width 0.2s ease;
+    }
+
+    .version-panel.is-open {
+      width: 280px;
+      min-width: 280px;
+    }
+
+    .version-panel-header {
+      padding: 0.75rem 1rem 0.5rem;
+      border-bottom: 1px solid #e0e0e0;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.5rem;
+    }
+
+    .version-panel-title {
+      font-size: 0.8125rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: #666;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .version-panel-close {
+      background: none;
+      border: none;
+      cursor: pointer;
+      font-size: 1.1rem;
+      color: #666;
+      line-height: 1;
+      padding: 0;
+      flex-shrink: 0;
+    }
+
+    .version-panel-close:hover { color: #111; }
+
+    .version-panel-body {
+      flex: 1;
+      overflow-y: auto;
+      padding: 0.5rem 0;
+    }
+
+    .version-item {
+      padding: 0.5rem 1rem;
+      border-bottom: 1px solid #efefef;
+      font-size: 0.8125rem;
+    }
+
+    .version-item:last-child { border-bottom: none; }
+
+    .version-item-date {
+      font-weight: 600;
+      margin-bottom: 0.25rem;
+    }
+
+    .version-item-meta {
+      color: #555;
+      display: flex;
+      gap: 0.5rem;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+
+    tr.is-selected { background: #fff3ee !important; }
+
+    tr[data-id] { cursor: pointer; }
+    tr[data-id]:hover td { background: #f9f9f9; }
   </style>
 </head>
 <body class="app-shell">
@@ -362,6 +444,17 @@
       </div>
 
     </div><!-- /.main-area -->
+
+    <!-- Version history panel -->
+    <aside class="version-panel" id="version-panel">
+      <div class="version-panel-header">
+        <span class="version-panel-title" id="version-panel-title">Versions</span>
+        <button class="version-panel-close" id="version-panel-close" title="Close">✕</button>
+      </div>
+      <div class="version-panel-body" id="version-panel-body">
+      </div>
+    </aside>
+
   </div><!-- /.app-body -->
 
 
@@ -627,7 +720,8 @@ function renderGrid() {
 
     const dataRows = gItems.map(a => {
       const cells = cols.map(c => `<td>${formatCell(c.key, a[c.key], a)}</td>`).join('');
-      return `<tr>${cells}</tr>`;
+      const selectedCls = selectedArtifactId === a.id ? ' is-selected' : '';
+      return `<tr data-id="${a.id}" class="${selectedCls}">${cells}</tr>`;
     }).join('');
 
     return groupRow + dataRows;
@@ -656,6 +750,17 @@ function renderGrid() {
 
   attachResizeHandles(container.querySelector('table'));
 
+  // Row click → version history panel
+  container.querySelectorAll('tr[data-id]').forEach(row => {
+    row.addEventListener('click', e => {
+      // Don't trigger if clicking a link inside the cell
+      if (e.target.closest('a')) return;
+      const id = parseInt(row.dataset.id, 10);
+      const artifact = state.artifacts.find(a => a.id === id);
+      if (artifact) openVersionPanel(artifact);
+    });
+  });
+
   const total = state.artifacts.length;
   const shown = items.length;
   const countEl = document.getElementById('artifact-count');
@@ -672,6 +777,99 @@ function showError(msg) {
         <p class="p-notification__message">${msg}</p>
       </div>
     </div>`;
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   Version history panel
+═══════════════════════════════════════════════════════════════════ */
+const versionPanel      = document.getElementById('version-panel');
+const versionPanelTitle = document.getElementById('version-panel-title');
+const versionPanelBody  = document.getElementById('version-panel-body');
+const versionPanelClose = document.getElementById('version-panel-close');
+
+let selectedArtifactId = null;
+
+versionPanelClose.addEventListener('click', closeVersionPanel);
+
+function closeVersionPanel() {
+  versionPanel.classList.remove('is-open');
+  selectedArtifactId = null;
+  document.querySelectorAll('tr.is-selected').forEach(r => r.classList.remove('is-selected'));
+}
+
+async function fetchVersions(artefactId) {
+  const res = await fetch(`${API_BASE}/v1/artefacts/${artefactId}/versions`, {
+    headers: { 'X-CSRF-Token': '1' },
+  });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return res.json();
+}
+
+async function fetchArtefact(artefactId) {
+  const res = await fetch(`${API_BASE}/v1/artefacts/${artefactId}`, {
+    headers: { 'X-CSRF-Token': '1' },
+  });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return res.json();
+}
+
+async function openVersionPanel(artifact) {
+  // If clicking the same row again, close
+  if (selectedArtifactId === artifact.id) {
+    closeVersionPanel();
+    return;
+  }
+
+  selectedArtifactId = artifact.id;
+  document.querySelectorAll('tr.is-selected').forEach(r => r.classList.remove('is-selected'));
+  document.querySelectorAll(`tr[data-id="${artifact.id}"]`).forEach(r => r.classList.add('is-selected'));
+
+  versionPanel.classList.add('is-open');
+  versionPanelTitle.textContent = artifact.name;
+  versionPanelBody.innerHTML = `
+    <div class="spinner-wrap" style="padding:2rem;">
+      <div class="p-icon--spinner u-animation--spin" style="width:1.5rem;height:1.5rem;"></div>
+    </div>`;
+
+  try {
+    const versions = await fetchVersions(artifact.id);
+
+    // Sort descending (YYYYMMDD strings sort lexicographically), take last 5
+    const last5 = versions
+      .slice()
+      .sort((a, b) => b.version.localeCompare(a.version))
+      .slice(0, 5);
+
+    if (last5.length === 0) {
+      versionPanelBody.innerHTML = `<p style="padding:1rem; color:#757575; font-size:0.8125rem;">No version history found.</p>`;
+      return;
+    }
+
+    // Fetch details for each version in parallel
+    const details = await Promise.all(last5.map(v => fetchArtefact(v.artefact_id)));
+
+    versionPanelBody.innerHTML = details.map((a, i) => {
+      const isCurrentVersion = (i === 0);
+      const statusLabel = a.status === 'MARKED_AS_FAILED' ? 'REJECTED' : (a.status || '—');
+      const statusCls   = statusClass(a.status);
+      const done  = a.completed_environment_reviews_count ?? 0;
+      const total = a.all_environment_reviews_count ?? 0;
+      const stageBadge = a.stage ? `<span class="stage-chip">${a.stage}</span>` : '';
+      const currentTag = isCurrentVersion ? ' <span style="color:#E95420; font-weight:700;">(current)</span>' : '';
+      return `
+        <div class="version-item">
+          <div class="version-item-date">${a.version}${currentTag}</div>
+          <div class="version-item-meta">
+            <span class="status ${statusCls}" style="font-size:0.7rem;">${statusLabel}</span>
+            ${stageBadge}
+            <span style="color:#888;">Reviews: ${done}/${total}</span>
+          </div>
+        </div>`;
+    }).join('');
+
+  } catch (err) {
+    versionPanelBody.innerHTML = `<p style="padding:1rem; color:#c7162b; font-size:0.8125rem;">Failed to load versions: ${err.message}</p>`;
+  }
 }
 
 /* ═══════════════════════════════════════════════════════════════════
