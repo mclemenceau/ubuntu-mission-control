@@ -36,7 +36,9 @@
         { "project": "ubuntustudio",   "arch": "amd64",        "version": "20260321",   "type": "desktop",              "path": "daily-live",                        "mandatory": false },
         { "project": "xubuntu",        "arch": "amd64",        "version": "20260326.1", "type": "desktop",              "path": "daily-live",                        "mandatory": false },
         { "project": "xubuntu",        "arch": "amd64",        "version": "20260326",   "type": "minimal",              "path": "daily-minimal",                     "mandatory": false },
-        { "project": "ubuntu",         "arch": "amd64",        "version": "20260325",   "type": "mini",                 "path": "daily-mini",                        "mandatory": false }
+        { "project": "ubuntu",         "arch": "amd64",        "version": "20260325",   "type": "mini",                 "path": "daily-mini",                        "mandatory": false },
+        { "project": "ubuntu-mate",    "arch": "amd64",        "version": "20260304",   "type": "desktop",              "path": "daily-live",                        "mandatory": false },
+        { "project": "ubuntukylin",    "arch": "amd64",        "version": "20260326.1", "type": "desktop",              "path": "daily-live",                        "mandatory": false }
       ]
     }
   ]
