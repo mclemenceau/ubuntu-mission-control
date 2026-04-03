@@ -1016,6 +1016,9 @@ async function loadFamily(family) {
   try {
     const data = await fetchArtefacts(family);
     state.artifacts = data;
+    // Pre-select the most recent release so only that subset is rendered and fetched
+    const releases = uniqueSorted(data.map(a => a.release));
+    state.selectedRelease = releases[0] ?? '';
     renderReleases();
     renderGrid();
   } catch (err) {
