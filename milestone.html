@@ -72,9 +72,6 @@
     }
     .dash-table tr:hover td { background: #fafafa; }
 
-    /* Sub-rows for multiple executions */
-    .sub-row td { background: #fafafa; padding-top: .2rem; padding-bottom: .2rem; }
-    .sub-row td:first-child { padding-left: 2rem; color: #888; font-size: 0.75rem; }
 
     /* ── Rate bar ────────────────────────────────────────── */
     .rate-bar { display:flex; height:8px; border-radius:3px; overflow:hidden; background:#e0e0e0; min-width:80px; }
@@ -93,7 +90,6 @@
     .chip--prog { background:#0066cc; color:#fff; }
     .chip--none { color:#bbb; font-style:italic; font-weight:400; font-size:.75rem; }
 
-    .badge-mand { color:#E95420; font-weight:700; font-size:.75rem; title:Mandatory; }
 
     /* ── Failures list ───────────────────────────────────── */
     .failure-item { margin: .25rem 0; font-size: .8125rem; }
@@ -149,11 +145,11 @@
 
       <div class="two-col">
         <div>
-          <div class="section-title">By Product</div>
+          <div class="section-title">By OS</div>
           <table class="dash-table" id="tbl-product"></table>
         </div>
         <div>
-          <div class="section-title">By Type</div>
+          <div class="section-title">By Owner</div>
           <table class="dash-table" id="tbl-type"></table>
         </div>
       </div>
@@ -164,8 +160,6 @@
       <div class="section-title" style="margin-top:2rem;">Failures</div>
       <div id="failures-area"></div>
 
-      <div class="section-title" style="margin-top:2rem;">All Builds</div>
-      <table class="dash-table" id="tbl-builds"></table>
 
     </div>
   </div>
@@ -241,12 +235,11 @@ function extractTester(resultName) {
 }
 
 /* ── Render helpers ──────────────────────────────────────────────── */
-function chips(p, f, s, prog) {
+function chips(p, f, s) {
   const parts = [];
-  if (p)    parts.push(`<span class="chip chip--pass">✓${p}</span>`);
-  if (f)    parts.push(`<span class="chip chip--fail">✗${f}</span>`);
-  if (s)    parts.push(`<span class="chip chip--skip">~${s}</span>`);
-  if (prog) parts.push(`<span class="chip chip--prog">…${prog} in progress</span>`);
+  if (p) parts.push(`<span class="chip chip--pass">✓${p}</span>`);
+  if (f) parts.push(`<span class="chip chip--fail">✗${f}</span>`);
+  if (s) parts.push(`<span class="chip chip--skip">~${s}</span>`);
   return parts.join('') || '<span class="chip chip--none">no tests</span>';
 }
 
@@ -267,11 +260,9 @@ function rateBar(p, f, s) {
 
 /* ── Aggregate test results from enriched builds ─────────────────── */
 function aggregateResults(enrichedList) {
-  // Returns { passed, failed, skipped, inProgressExecs }
-  const r = { passed: 0, failed: 0, skipped: 0, inProgressExecs: 0 };
+  const r = { passed: 0, failed: 0, skipped: 0 };
   for (const e of enrichedList) {
     for (const ex of e.manualExecs) {
-      if (ex.execStatus === 'IN_PROGRESS') r.inProgressExecs++;
       for (const tr of ex.results) {
         if (tr.status === 'PASSED')  r.passed++;
         if (tr.status === 'FAILED')  r.failed++;
@@ -287,22 +278,14 @@ function renderDashboard(milestone, enriched) {
 
   /* ── Stat cards ─────────────────────────────────────────── */
   const all     = aggregateResults(enriched);
-  const covered = enriched.filter(e => e.manualExecs.length > 0).length;
   const total   = enriched.length;
-  const mandatoryFailing = enriched.filter(e =>
-    e.build.mandatory && e.manualExecs.some(ex => ex.results.some(r => r.status === 'FAILED'))
-  ).length;
-  const passRate = all.passed + all.failed > 0
+const passRate = all.passed + all.failed > 0
     ? Math.round(all.passed / (all.passed + all.failed) * 100) : null;
 
   document.getElementById('stat-cards').innerHTML = `
     <div class="stat-card stat-card--neutral">
       <div class="stat-card__value">${total}</div>
-      <div class="stat-card__label">Builds<br><small>${enriched.filter(e=>e.build.mandatory).length} mandatory</small></div>
-    </div>
-    <div class="stat-card stat-card--neutral">
-      <div class="stat-card__value">${covered}</div>
-      <div class="stat-card__label">With manual tests<br><small>${total-covered} not yet tested</small></div>
+      <div class="stat-card__label">Builds</div>
     </div>
     <div class="stat-card stat-card--passed">
       <div class="stat-card__value">${all.passed}</div>
@@ -310,54 +293,50 @@ function renderDashboard(milestone, enriched) {
     </div>
     <div class="stat-card stat-card--failed">
       <div class="stat-card__value">${all.failed}</div>
-      <div class="stat-card__label">Tests failed<br><small>${mandatoryFailing} on mandatory builds</small></div>
-    </div>
-    <div class="stat-card stat-card--pending">
-      <div class="stat-card__value">${all.inProgressExecs}</div>
-      <div class="stat-card__label">Executions in progress</div>
+      <div class="stat-card__label">Tests failed</div>
     </div>
     <div class="stat-card stat-card--${passRate >= 80 ? 'passed' : passRate !== null ? 'failed' : 'neutral'}">
       <div class="stat-card__value">${passRate !== null ? passRate + '%' : '—'}</div>
       <div class="stat-card__label">Pass rate<br><small>(excl. skipped)</small></div>
     </div>`;
 
-  /* ── By Product ─────────────────────────────────────────── */
-  const byProject = {};
+  /* ── By OS ───────────────────────────────────────────────── */
+  const byOS = {};
   for (const e of enriched) {
-    const p = e.build.project;
-    if (!byProject[p]) byProject[p] = [];
-    byProject[p].push(e);
+    const key = e.os || '(unknown)';
+    if (!byOS[key]) byOS[key] = [];
+    byOS[key].push(e);
   }
 
   document.getElementById('tbl-product').innerHTML = tableHTML(
-    ['Product', 'Builds', 'Tests', 'Rate'],
-    Object.entries(byProject).sort((a,b) => a[0].localeCompare(b[0])).map(([proj, items]) => {
+    ['OS', 'Builds', 'Tests', 'Rate'],
+    Object.entries(byOS).sort((a,b) => a[0].localeCompare(b[0])).map(([os, items]) => {
       const a = aggregateResults(items);
       return [
-        `<strong>${proj}</strong>`,
+        `<strong>${os}</strong>`,
         items.length,
-        chips(a.passed, a.failed, a.skipped, a.inProgressExecs),
+        chips(a.passed, a.failed, a.skipped),
         rateBar(a.passed, a.failed, a.skipped),
       ];
     })
   );
 
-  /* ── By Type ─────────────────────────────────────────────── */
-  const byType = {};
+  /* ── By Owner ────────────────────────────────────────────── */
+  const byOwner = {};
   for (const e of enriched) {
-    const t = e.build.type;
-    if (!byType[t]) byType[t] = [];
-    byType[t].push(e);
+    const key = e.owner || '(unknown)';
+    if (!byOwner[key]) byOwner[key] = [];
+    byOwner[key].push(e);
   }
 
   document.getElementById('tbl-type').innerHTML = tableHTML(
-    ['Type', 'Builds', 'Tests', 'Rate'],
-    Object.entries(byType).sort((a,b) => a[0].localeCompare(b[0])).map(([type, items]) => {
+    ['Owner', 'Builds', 'Tests', 'Rate'],
+    Object.entries(byOwner).sort((a,b) => a[0].localeCompare(b[0])).map(([owner, items]) => {
       const a = aggregateResults(items);
       return [
-        `<strong>${type}</strong>`,
+        `<strong>${owner}</strong>`,
         items.length,
-        chips(a.passed, a.failed, a.skipped, a.inProgressExecs),
+        chips(a.passed, a.failed, a.skipped),
         rateBar(a.passed, a.failed, a.skipped),
       ];
     })
@@ -420,45 +399,7 @@ function renderDashboard(milestone, enriched) {
         </tbody>
       </table>`;
 
-  /* ── All Builds ──────────────────────────────────────────── */
-  const tbody = enriched.map(e => {
-    const mainRow = `<tr>
-      <td>${e.build.project}</td>
-      <td>${e.build.type}</td>
-      <td>${e.build.arch}</td>
-      <td style="font-family:monospace;">${e.build.version}</td>
-      <td>${e.build.mandatory ? '<span class="badge-mand">★</span>' : ''}</td>
-      <td>${e.manualExecs.length}</td>
-      <td>${(() => {
-        const a = aggregateResults([e]);
-        return chips(a.passed, a.failed, a.skipped, a.inProgressExecs);
-      })()}</td>
-    </tr>`;
-
-    // Sub-rows for each execution
-    const subRows = e.manualExecs.map(ex => {
-      const p = ex.results.filter(r => r.status === 'PASSED').length;
-      const f = ex.results.filter(r => r.status === 'FAILED').length;
-      const s = ex.results.filter(r => r.status === 'SKIPPED').length;
-      const prog = ex.execStatus === 'IN_PROGRESS' ? ' (in progress)' : '';
-      return `<tr class="sub-row">
-        <td colspan="5">Execution #${ex.execId}${prog}</td>
-        <td></td>
-        <td>${chips(p, f, s, 0)}</td>
-      </tr>`;
-    }).join('');
-
-    return mainRow + subRows;
-  }).join('');
-
-  document.getElementById('tbl-builds').innerHTML = `
-    <thead><tr>
-      <th>Product</th><th>Type</th><th>Arch</th><th>Version</th>
-      <th title="Mandatory">M</th><th>Executions</th><th>Results</th>
-    </tr></thead>
-    <tbody>${tbody}</tbody>`;
-
-  document.getElementById('progress-area').style.display = 'none';
+document.getElementById('progress-area').style.display = 'none';
   document.getElementById('dashboard').style.display    = 'block';
 }
 
@@ -502,7 +443,7 @@ async function loadDashboard(milestone) {
     for (const c of candidates) {
       const versions = await api(`/v1/artefacts/${c.id}/versions`).catch(() => []);
       const match    = versions.find(v => v.version === e.build.version);
-      if (match) { e.artefactId = match.artefact_id; return; }
+      if (match) { e.artefactId = match.artefact_id; e.os = c.os; e.owner = c.owner; return; }
     }
   }));
 
