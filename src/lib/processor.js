@@ -27,6 +27,11 @@ export function buildProductItems(artefacts, milestone) {
       tests:       { passed: 0, failed: 0, inProgress: 0, notStarted: 0 },
       bugs:        [],
       execIds:     [],
+      // Temporary accumulators populated in Phase 3 from individual test results.
+      // Overwrite the coarser execution-level counts once real results are available.
+      _resultPassed: 0,
+      _resultFailed: 0,
+      _execsWithResults: new Set(),
     }))
 }
 
@@ -82,6 +87,10 @@ export async function enrichWithBugs(items, onProgress) {
       const itemBugs = new Set()
 
       for (const r of results) {
+        // Tally individual test result statuses (more accurate than execution-level status)
+        if (r.status === 'PASSED') item._resultPassed++
+        else if (r.status === 'FAILED') item._resultFailed++
+
         // Structured API issues
         for (const { issue } of r.issues ?? []) {
           if (issue?.source === 'launchpad' && issue?.key) {
@@ -101,12 +110,31 @@ export async function enrichWithBugs(items, onProgress) {
             itemBugs.add(m[1])
           }
         }
+
+        if (results.length > 0) item._execsWithResults.add(execId)
       }
 
       item.bugs = [...itemBugs]
       onProgress?.(++done, queue.length)
     }),
   )
+
+  // Replace Phase 2 execution-level counts with actual submitted test results.
+  // An execution that is IN_PROGRESS but has results is no longer "pending" —
+  // it has real data. An execution with no results at all stays in inProgress.
+  for (const item of items) {
+    if (item._resultPassed + item._resultFailed > 0) {
+      item.tests.passed = item._resultPassed
+      item.tests.failed = item._resultFailed
+      item.tests.inProgress = Math.max(
+        0,
+        item.tests.inProgress - item._execsWithResults.size,
+      )
+    }
+    delete item._resultPassed
+    delete item._resultFailed
+    delete item._execsWithResults
+  }
 
   return globalBugs.size
 }
