@@ -2,7 +2,7 @@
   import RefreshControl from './RefreshControl.svelte'
 
   let {
-    milestones       = [],
+    releases         = [],
     selectedIndex    = 0,
     clockStr         = '—',
     todayDisplay     = '',
@@ -17,7 +17,7 @@
     onManualRefresh     = () => {},
   } = $props()
 
-  let selectedMs = $derived(milestones[selectedIndex])
+  let selectedRelease = $derived(releases[selectedIndex])
 </script>
 
 <header class="header">
@@ -29,22 +29,25 @@
 
   <span class="sep">|</span>
 
-  <!-- Milestone selector -->
+  <!-- Release selector -->
   <div class="milestone">
-    <select
-      value={selectedIndex}
-      onchange={e => onMilestoneChange(Number(e.target.value))}
-    >
-      {#each milestones as ms, i}
-        <option value={i}>
-          {ms.release.charAt(0).toUpperCase() + ms.release.slice(1)}
-          {#if ms.name} — {ms.name}{/if}
-        </option>
-      {/each}
-    </select>
-    {#if selectedMs}
+    {#if releases.length > 1}
+      <select
+        value={selectedIndex}
+        onchange={e => onMilestoneChange(Number(e.target.value))}
+      >
+        {#each releases as r, i}
+          <option value={i}>{r.release.charAt(0).toUpperCase() + r.release.slice(1)}</option>
+        {/each}
+      </select>
+    {:else if selectedRelease}
+      <span class="release-name">
+        {selectedRelease.release.charAt(0).toUpperCase() + selectedRelease.release.slice(1)}
+      </span>
+    {/if}
+    {#if selectedRelease}
       <span class="milestone-meta">
-        {selectedMs.builds.length} builds · {todayDisplay}
+        {selectedRelease.builds.length} builds · {todayDisplay}
       </span>
     {/if}
   </div>
@@ -116,6 +119,12 @@
     font-weight: 700;
     font-family: inherit;
     cursor: pointer;
+  }
+
+  .release-name {
+    font-size: 0.9rem;
+    font-weight: 700;
+    color: var(--text);
   }
 
   .milestone-meta {

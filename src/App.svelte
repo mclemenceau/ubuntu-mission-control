@@ -1,6 +1,6 @@
 <script>
   import { onMount, onDestroy } from 'svelte'
-  import { milestones } from './lib/milestones.js'
+  import { releases } from './lib/milestones.js'
   import {
     buildProductItems,
     enrichWithTestExecutions,
@@ -54,7 +54,7 @@
     loadPct   = 0
 
     try {
-      const ms = milestones[selectedIndex]
+      const ms = releases[selectedIndex]
 
       // Phase 1 — artifacts
       loadLabel = 'Loading artifacts…'
@@ -173,7 +173,7 @@
 
 <div class="shell">
   <Header
-    {milestones}
+    {releases}
     {selectedIndex}
     {clockStr}
     todayDisplay={fmtDate(new Date())}

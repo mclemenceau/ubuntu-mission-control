@@ -2,6 +2,19 @@ import milestonesData from '../../milestones.json'
 
 export const milestones = milestonesData.milestones
 
+/**
+ * Unique releases for the Mission Control selector.
+ * Deduplicates by release codename — if multiple milestone entries exist
+ * for the same release (Alpha, Beta, RC…), the last one wins so we always
+ * use the most recent build list and mandatory flags.
+ */
+export const releases = Object.values(
+  milestonesData.milestones.reduce((acc, ms) => {
+    acc[ms.release] = ms
+    return acc
+  }, {}),
+)
+
 /** Maps project names to their OS filter string used in the Test Observer API. */
 const PROJECT_OS = {
   ubuntu:         'ubuntu-desktop',
