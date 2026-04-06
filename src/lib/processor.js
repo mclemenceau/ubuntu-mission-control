@@ -11,10 +11,7 @@ export function buildProductItems(artefacts, milestone) {
   const mandatoryKeys = buildMandatorySet(milestone)
 
   return artefacts
-    .filter(a =>
-      a.release === milestone.release &&
-      a.version?.startsWith(today),
-    )
+    .filter(a => a.release === milestone.release)
     .map(a => ({
       id:          a.id,
       name:        a.name,
@@ -24,6 +21,7 @@ export function buildProductItems(artefacts, milestone) {
       version:     a.version,
       status:      a.status ?? null,
       mandatory:   mandatoryKeys.has(`${a.name}||${a.os ?? ''}`),
+      builtToday:  a.version?.startsWith(today) ?? false,
       tests:       { passed: 0, failed: 0, inProgress: 0, notStarted: 0 },
       bugs:        [],
       execIds:     [],
@@ -143,9 +141,10 @@ export async function enrichWithBugs(items, onProgress) {
  * Computes dashboard KPIs from the current product list.
  */
 export function computeKpis(products) {
-  const total    = products.length
-  const approved = products.filter(p => p.status === 'APPROVED').length
-  const appPct   = total > 0 ? Math.round((approved / total) * 100) : null
+  const total      = products.length
+  const todayCount = products.filter(p => p.builtToday).length
+  const approved   = products.filter(p => p.status === 'APPROVED').length
+  const appPct     = total > 0 ? Math.round((approved / total) * 100) : null
 
   const passed     = products.reduce((s, p) => s + p.tests.passed, 0)
   const failed     = products.reduce((s, p) => s + p.tests.failed, 0)
@@ -159,7 +158,7 @@ export function computeKpis(products) {
   const bugCount = new Set(products.flatMap(p => p.bugs)).size
 
   return {
-    buildsToday: total,
+    buildsToday: todayCount,
     approved:    { count: approved, total, pct: appPct },
     tests:       { total: totalExecs, passed, failed, inProgress },
     passRate:    { pct: passRate, passed, outOf: passed + failed },

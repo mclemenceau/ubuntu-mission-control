@@ -10,11 +10,13 @@
 
   let badgeLabel = $derived(STATUS_LABELS[product.status] ?? '—')
 
+  // Stale (not built today): only show green/red for reviewed artifacts,
+  // everything else collapses to grey.
   let cardClass = $derived(
-    product.status === 'APPROVED'         ? 'approved'
+    product.status === 'APPROVED'           ? 'approved'
     : product.status === 'MARKED_AS_FAILED' ? 'failed'
-    : product.status === 'UNDECIDED'        ? 'pending'
-    : 'unknown'
+    : product.builtToday                    ? 'pending'
+    : 'stale'
   )
 
   let hasTests = $derived(
@@ -66,6 +68,7 @@
   .card.approved { border-color: var(--green-border); background: var(--green-bg); }
   .card.failed   { border-color: var(--red-border);   background: var(--red-bg);   }
   .card.pending  { border-color: var(--amber-border); background: var(--amber-bg); }
+  .card.stale    { border-color: #252525; background: #0c0c10; opacity: 0.6; }
 
   .card.mandatory::after {
     content: '★';
@@ -116,6 +119,7 @@
   .badge.approved { background: var(--green-border); color: #5ddb5d; }
   .badge.failed   { background: var(--red-border);   color: var(--red); }
   .badge.pending  { background: #2a2a00; color: var(--amber); }
+  .badge.stale    { background: transparent; color: #3a3a3a; }
 
   /* Test chips */
   .tests {
