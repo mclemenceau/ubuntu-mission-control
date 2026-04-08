@@ -1,6 +1,6 @@
 <script>
-  /** @type {{ product: import('../lib/processor.js').Product }} */
-  let { product } = $props()
+  /** @type {{ product: import('../lib/processor.js').Product, onclick: () => void }} */
+  let { product, onclick } = $props()
 
   const STATUS_LABELS = {
     APPROVED:         '✓ Approved',
@@ -55,7 +55,7 @@
   )
 </script>
 
-<div class="card {cardClass}" class:mandatory={product.mandatory} style={cardStyle}>
+<div class="card {cardClass}" class:mandatory={product.mandatory} style={cardStyle} {onclick} role="button" tabindex="0">
   <div class="name" title={product.name}>{product.displayName}</div>
   <div class="meta">{product.type} · {product.arch}</div>
 

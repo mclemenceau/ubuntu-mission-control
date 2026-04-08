@@ -1,16 +1,23 @@
 <script>
-  import ProductCard from './ProductCard.svelte'
+  import ProductCard  from './ProductCard.svelte'
+  import ProductModal from './ProductModal.svelte'
 
   /** @type {{ products: Array }} */
   let { products } = $props()
+
+  let selectedProduct = $state(null)
 </script>
+
+{#if selectedProduct}
+  <ProductModal product={selectedProduct} onclose={() => selectedProduct = null} />
+{/if}
 
 {#if products.length === 0}
   <div class="empty">No artifacts built today yet.</div>
 {:else}
   <div class="grid">
     {#each products as product (product.id)}
-      <ProductCard {product} />
+      <ProductCard {product} onclick={() => selectedProduct = product} />
     {/each}
   </div>
 {/if}
