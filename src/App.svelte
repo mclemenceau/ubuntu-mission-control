@@ -18,7 +18,7 @@
   let selectedIndex = $state(0)
 
   // ── Card age-style variant ─────────────────────────────────────
-  let cardVariant = $state('default')
+  let cardVariant = $state('B')
 
   // ── Data ──────────────────────────────────────────────────────
   let products = $state([])
