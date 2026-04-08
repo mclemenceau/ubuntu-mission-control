@@ -17,6 +17,9 @@
   // ── Milestone ──────────────────────────────────────────────────
   let selectedIndex = $state(0)
 
+  // ── Card age-style variant ─────────────────────────────────────
+  let cardVariant = $state('default')
+
   // ── Data ──────────────────────────────────────────────────────
   let products = $state([])
   let kpis = $derived(products.length > 0 ? computeKpis(products) : null)
@@ -208,7 +211,13 @@
     {:else if loadError}
       <div class="error-msg">Error: {loadError}</div>
     {:else}
-      <ProductGrid {products} />
+      <div class="grid-toolbar">
+        <span class="toolbar-label">Age style</span>
+        {#each [['default','Current'],['A','Stripe'],['B','Top bar'],['C','Pill']] as [v, label]}
+          <button class="variant-btn" class:active={cardVariant === v} onclick={() => cardVariant = v}>{label}</button>
+        {/each}
+      </div>
+      <ProductGrid {products} variant={cardVariant} />
     {/if}
   </div>
 </div>
@@ -281,4 +290,34 @@
     padding: 1rem 1.5rem;
     font-size: 0.875rem;
   }
+
+  .grid-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    margin-bottom: 0.6rem;
+  }
+
+  .toolbar-label {
+    font-size: 0.6rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    margin-right: 0.15rem;
+  }
+
+  .variant-btn {
+    background: var(--bg-panel);
+    border: 1px solid var(--border-faint);
+    color: var(--text-dim);
+    font-size: 0.65rem;
+    font-weight: 600;
+    padding: 0.2em 0.65em;
+    border-radius: 3px;
+    cursor: pointer;
+    transition: border-color 0.15s, color 0.15s;
+  }
+  .variant-btn:hover  { border-color: #555; color: #ccc; }
+  .variant-btn.active { border-color: var(--accent); color: var(--accent); }
 </style>

@@ -1,6 +1,6 @@
 <script>
-  /** @type {{ product: import('../lib/processor.js').Product, onclick: () => void }} */
-  let { product, onclick } = $props()
+  /** @type {{ product: import('../lib/processor.js').Product, onclick: () => void, variant?: string }} */
+  let { product, onclick, variant = 'default' } = $props()
 
   const STATUS_LABELS = {
     APPROVED:         '✓ Approved',
@@ -55,7 +55,7 @@
   )
 </script>
 
-<div class="card {cardClass}" class:mandatory={product.mandatory} style={cardStyle} {onclick} role="button" tabindex="0">
+<div class="card {cardClass} v-{variant}" class:mandatory={product.mandatory} style={cardStyle} {onclick} role="button" tabindex="0">
   <div class="name" title={product.name}>{product.displayName}</div>
   <div class="meta">{product.type} · {product.arch}</div>
 
@@ -213,5 +213,32 @@
     font-weight: 700;
     color: var(--age-text);
     letter-spacing: 0.03em;
+  }
+
+  /* ── Variant A: bold left inset stripe, uniform dark cards ───── */
+  .card.v-A.age   { border-color: var(--border-faint); background: var(--bg-panel); box-shadow: inset 5px 0 0 var(--age-border); }
+  .card.v-A.stale { border-color: #252525; background: #0c0c10; box-shadow: inset 5px 0 0 #2a2a2a; }
+  .card.v-A::before { opacity: 0; }
+  .v-A .badge.age   { background: #1e1e1e; color: #777; }
+  .v-A .age-label   { color: var(--age-text); }
+
+  /* ── Variant B: top glow bar, dark cards ─────────────────────── */
+  .card.v-B.age   { border-color: var(--border-faint); border-top-color: var(--age-border); border-top-width: 3px; background: var(--bg-panel); }
+  .card.v-B.stale { border-color: #252525; background: #0c0c10; }
+  .card.v-B::before { top: 0; bottom: auto; height: 4px; opacity: 1; }
+  .v-B .badge.age   { background: #1e1e1e; color: #777; }
+  .v-B .age-label   { color: var(--age-text); }
+
+  /* ── Variant C: uniform dark cards, age shown only via filled pill */
+  .card.v-C.age   { border-color: var(--border-faint); background: var(--bg-panel); }
+  .card.v-C.stale { border-color: #252525; background: #0c0c10; opacity: 0.6; }
+  .card.v-C::before { opacity: 0; }
+  .v-C .badge.age   { background: #1e1e1e; color: #777; }
+  .v-C .age-label   {
+    background: var(--age-badge);
+    color: var(--age-text);
+    padding: 0.15em 0.45em;
+    border-radius: 3px;
+    bottom: 0.4rem;
   }
 </style>

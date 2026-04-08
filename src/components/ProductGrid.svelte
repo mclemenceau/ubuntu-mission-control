@@ -2,8 +2,8 @@
   import ProductCard  from './ProductCard.svelte'
   import ProductModal from './ProductModal.svelte'
 
-  /** @type {{ products: Array }} */
-  let { products } = $props()
+  /** @type {{ products: Array, variant?: string }} */
+  let { products, variant = 'default' } = $props()
 
   let selectedProduct = $state(null)
 </script>
@@ -17,7 +17,7 @@
 {:else}
   <div class="grid">
     {#each products as product (product.id)}
-      <ProductCard {product} onclick={() => selectedProduct = product} />
+      <ProductCard {product} {variant} onclick={() => selectedProduct = product} />
     {/each}
   </div>
 {/if}

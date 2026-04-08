@@ -97,7 +97,7 @@
 
 <!-- svelte-ignore a11y_click_events_have_key_events -->
 <div class="backdrop" onclick={onBackdropClick} role="presentation">
-  <div class="modal {cardClass}" style={cardStyle} role="dialog" aria-modal="true">
+  <div class="modal" style={cardStyle} role="dialog" aria-modal="true">
 
     <!-- ── Header ─────────────────────────────────────────────── -->
     <div class="modal-header {cardClass}">
@@ -275,16 +275,11 @@
     display: flex;
     flex-direction: column;
     border-radius: 7px;
-    border: 1px solid var(--border-faint);
+    border: 1px solid #2a2a2a;
     background: var(--bg-panel);
     overflow: hidden;
     box-shadow: 0 20px 60px rgba(0,0,0,0.6);
   }
-
-  .modal.approved { border-color: var(--green-border); background: var(--green-bg); }
-  .modal.failed   { border-color: var(--red-border);   background: var(--red-bg);   }
-  .modal.age      { border-color: var(--age-border);   background: var(--age-bg);   }
-  .modal.stale    { border-color: #252525; background: #0c0c10; }
 
   /* ── Header ───────────────────────────────────────────────── */
   .modal-header {
@@ -297,10 +292,10 @@
     flex-shrink: 0;
   }
 
-  .modal-header.approved { background: rgba(0,80,0,0.25); }
-  .modal-header.failed   { background: rgba(80,0,0,0.25); }
-  .modal-header.age      { background: rgba(0,0,0,0.15); }
-  .modal-header.stale    { background: rgba(0,0,0,0.2); }
+  .modal-header.approved { background: var(--green-bg);  border-bottom-color: var(--green-border); }
+  .modal-header.failed   { background: var(--red-bg);    border-bottom-color: var(--red-border); }
+  .modal-header.age      { background: var(--age-bg);    border-bottom-color: var(--age-border); }
+  .modal-header.stale    { background: #0c0c10; border-bottom-color: #252525; }
 
   .header-left  { display: flex; flex-direction: column; gap: 0.2rem; min-width: 0; }
   .header-right { display: flex; align-items: center; gap: 0.5rem; flex-shrink: 0; }
