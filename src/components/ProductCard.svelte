@@ -97,7 +97,14 @@
     position: relative;
     background: var(--bg-panel);
     overflow: hidden;
-    transition: border-color 0.3s, background 0.3s;
+    transition: border-color 0.3s, background 0.3s, transform 0.15s, box-shadow 0.15s;
+    cursor: default;
+  }
+
+  .card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+    filter: brightness(1.12);
   }
 
   /* Bottom accent strip — age colour on all cards */
