@@ -1,6 +1,5 @@
 <script>
   import { onMount, onDestroy } from 'svelte'
-  import { releases } from './lib/milestones.js'
   import {
     buildProductItems,
     enrichWithTestExecutions,
@@ -15,6 +14,7 @@
   import ProductGrid from './components/ProductGrid.svelte'
 
   // ── Milestone ──────────────────────────────────────────────────
+  let releases      = $state([])
   let selectedIndex = $state(0)
 
   // ── Card age-style variant ─────────────────────────────────────
@@ -57,12 +57,16 @@
     loadPct   = 0
 
     try {
-      const ms = releases[selectedIndex]
-
       // Phase 1 — artifacts
       loadLabel = 'Loading artifacts…'
       loadPct   = 5
       const artefacts = await fetchArtefacts()
+
+      // Derive available releases from API response (first load only)
+      if (releases.length === 0) {
+        releases = [...new Set(artefacts.map(a => a.release))].sort().reverse().map(r => ({ release: r }))
+      }
+      const ms = releases[selectedIndex] ?? releases[0]
 
       loadLabel = "Filtering today's builds…"
       loadPct   = 15

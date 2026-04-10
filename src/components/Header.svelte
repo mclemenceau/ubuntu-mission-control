@@ -48,7 +48,7 @@
     {/if}
     {#if selectedRelease}
       <span class="milestone-meta">
-        {productCount !== null ? productCount : selectedRelease.builds.length} builds · {todayDisplay}
+        {productCount} builds · {todayDisplay}
       </span>
     {/if}
   </div>

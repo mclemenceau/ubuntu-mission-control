@@ -1,5 +1,4 @@
 import { todayStr, artifactTypeLabel, versionAgeDays, extractArch } from './utils.js'
-import { buildMandatorySet } from './milestones.js'
 import { fetchBuilds, fetchTestResults } from '../api/client.js'
 
 /**
@@ -8,7 +7,6 @@ import { fetchBuilds, fetchTestResults } from '../api/client.js'
  */
 export function buildProductItems(artefacts, milestone) {
   const today = todayStr()
-  const mandatoryKeys = buildMandatorySet(milestone)
 
   return artefacts
     .filter(a => a.release === milestone.release)
@@ -20,7 +18,7 @@ export function buildProductItems(artefacts, milestone) {
       type:        artifactTypeLabel(a.name, a.release),
       version:     a.version,
       status:      a.status ?? null,
-      mandatory:   mandatoryKeys.has(`${a.name}||${a.os ?? ''}`),
+      mandatory:   false,
       builtToday:  a.version?.startsWith(today) ?? false,
       ageDays:     versionAgeDays(a.version),
       tests:       { passed: 0, failed: 0, inProgress: 0, notStarted: 0 },
