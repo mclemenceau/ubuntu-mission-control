@@ -270,11 +270,11 @@
 
   .modal {
     width: 100%;
-    max-width: 800px;
+    max-width: 1400px;
     max-height: 88vh;
     display: flex;
     flex-direction: column;
-    border-radius: 7px;
+    border-radius: 12px;
     border: 1px solid #2a2a2a;
     background: var(--bg-panel);
     overflow: hidden;
@@ -286,8 +286,8 @@
     display: flex;
     align-items: flex-start;
     justify-content: space-between;
-    gap: 1rem;
-    padding: 0.85rem 1rem;
+    gap: 1.75rem;
+    padding: 1.5rem 1.75rem;
     border-bottom: 1px solid rgba(255,255,255,0.06);
     flex-shrink: 0;
   }
@@ -297,22 +297,22 @@
   .modal-header.age      { background: var(--age-bg);    border-bottom-color: var(--age-border); }
   .modal-header.stale    { background: #0c0c10; border-bottom-color: #252525; }
 
-  .header-left  { display: flex; flex-direction: column; gap: 0.2rem; min-width: 0; }
-  .header-right { display: flex; align-items: center; gap: 0.5rem; flex-shrink: 0; }
+  .header-left  { display: flex; flex-direction: column; gap: 0.35rem; min-width: 0; }
+  .header-right { display: flex; align-items: center; gap: 0.875rem; flex-shrink: 0; }
 
   .modal-name {
-    font-size: 0.9rem;
+    font-size: 1.6rem;
     font-weight: 700;
     color: #ddd;
     display: flex;
     align-items: center;
-    gap: 0.4rem;
+    gap: 0.7rem;
     white-space: nowrap;
     overflow: hidden;
   }
 
   .ext-link {
-    font-size: 0.7rem;
+    font-size: 1.2rem;
     font-weight: 400;
     color: var(--accent);
     text-decoration: none;
@@ -323,37 +323,37 @@
   .ext-link:hover { opacity: 1; }
 
   .os-tag {
-    font-size: 0.65rem;
+    font-size: 1.15rem;
     font-weight: 700;
     letter-spacing: 0.04em;
     text-transform: uppercase;
     color: var(--accent);
     background: rgba(255,255,255,0.07);
     padding: 0.15em 0.5em;
-    border-radius: 3px;
+    border-radius: 5px;
     white-space: nowrap;
     flex-shrink: 0;
   }
 
   .modal-sub {
-    font-size: 0.7rem;
+    font-size: 1.2rem;
     color: var(--text-dim);
     display: flex;
     align-items: center;
-    gap: 0.4rem;
+    gap: 0.7rem;
   }
 
   .mandatory-tag {
     color: var(--accent);
-    font-size: 0.65rem;
+    font-size: 1.15rem;
     font-weight: 700;
   }
 
   .hbadge {
     display: inline-block;
     padding: 0.15em 0.55em;
-    border-radius: 3px;
-    font-size: 0.65rem;
+    border-radius: 5px;
+    font-size: 1.15rem;
     font-weight: 700;
     letter-spacing: 0.04em;
     text-transform: uppercase;
@@ -366,7 +366,7 @@
   .hbadge.stale    { background: transparent; color: #666; }
 
   .age-chip {
-    font-size: 0.65rem;
+    font-size: 1.15rem;
     font-family: monospace;
     font-weight: 700;
   }
@@ -375,10 +375,10 @@
     background: none;
     border: none;
     color: var(--text-dim);
-    font-size: 0.85rem;
+    font-size: 1.5rem;
     cursor: pointer;
-    padding: 0.15rem 0.3rem;
-    border-radius: 3px;
+    padding: 0.25rem 0.5rem;
+    border-radius: 5px;
     line-height: 1;
     transition: color 0.15s, background 0.15s;
   }
@@ -388,8 +388,8 @@
   .details-strip {
     display: flex;
     flex-wrap: wrap;
-    gap: 0.5rem 1.5rem;
-    padding: 0.65rem 1rem;
+    gap: 0.875rem 2.5rem;
+    padding: 1.1rem 1.75rem;
     border-bottom: 1px solid rgba(255,255,255,0.05);
     flex-shrink: 0;
   }
@@ -397,23 +397,23 @@
   .detail-item {
     display: flex;
     align-items: baseline;
-    gap: 0.35rem;
+    gap: 0.6rem;
   }
   .detail-item.full { flex-basis: 100%; }
 
   .dl {
-    font-size: 0.6rem;
+    font-size: 1rem;
     font-weight: 700;
     letter-spacing: 0.06em;
     text-transform: uppercase;
     color: var(--text-dim);
   }
   .dv {
-    font-size: 0.7rem;
+    font-size: 1.2rem;
     color: #ccc;
     display: flex;
     align-items: center;
-    gap: 0.25rem;
+    gap: 0.44rem;
     flex-wrap: wrap;
   }
 
@@ -421,16 +421,16 @@
   .modal-body {
     overflow-y: auto;
     flex: 1;
-    padding: 0.75rem 1rem;
+    padding: 1.3rem 1.75rem;
     display: flex;
     flex-direction: column;
-    gap: 0.75rem;
+    gap: 1.3rem;
   }
 
   .state-msg {
-    font-size: 0.8rem;
+    font-size: 1.4rem;
     color: var(--text-dim);
-    padding: 1rem 0;
+    padding: 1.75rem 0;
     text-align: center;
   }
   .state-msg.err { color: var(--red); }
@@ -438,17 +438,17 @@
   /* ── Build block ──────────────────────────────────────────── */
   .build-block {
     border: 1px solid rgba(255,255,255,0.07);
-    border-radius: 5px;
+    border-radius: 9px;
     overflow: hidden;
   }
 
   .build-title {
-    font-size: 0.7rem;
+    font-size: 1.2rem;
     font-weight: 700;
     letter-spacing: 0.04em;
     text-transform: uppercase;
     color: var(--text-dim);
-    padding: 0.4rem 0.75rem;
+    padding: 0.7rem 1.3rem;
     background: rgba(255,255,255,0.04);
     border-bottom: 1px solid rgba(255,255,255,0.05);
   }
@@ -456,10 +456,10 @@
   .build-status { color: var(--accent); }
 
   .no-exec, .no-results {
-    font-size: 0.7rem;
+    font-size: 1.2rem;
     color: #555;
     font-style: italic;
-    padding: 0.5rem 0.75rem;
+    padding: 0.875rem 1.3rem;
   }
 
   /* ── Exec block ───────────────────────────────────────────── */
@@ -472,8 +472,8 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 0.5rem;
-    padding: 0.45rem 0.75rem;
+    gap: 0.875rem;
+    padding: 0.8rem 1.3rem;
     background: rgba(0,0,0,0.15);
   }
 
@@ -481,33 +481,33 @@
     display: flex;
     align-items: center;
     flex-wrap: wrap;
-    gap: 0.4rem;
+    gap: 0.7rem;
     flex: 1;
     min-width: 0;
   }
 
   .exec-plan {
-    font-size: 0.7rem;
+    font-size: 1.2rem;
     font-weight: 600;
     color: #bbb;
   }
 
   .exec-env {
-    font-size: 0.65rem;
+    font-size: 1.15rem;
     color: #666;
     font-style: italic;
   }
 
   .exec-user {
-    font-size: 0.65rem;
+    font-size: 1.15rem;
     color: #aaa;
     background: rgba(255,255,255,0.05);
     padding: 0.05em 0.35em;
-    border-radius: 2px;
+    border-radius: 3px;
   }
 
   .exec-link {
-    font-size: 0.62rem;
+    font-size: 1.1rem;
     color: var(--accent);
     text-decoration: none;
     opacity: 0.75;
@@ -516,10 +516,10 @@
   .exec-link:hover { opacity: 1; }
 
   .exec-badge {
-    font-size: 0.6rem;
+    font-size: 1rem;
     font-weight: 700;
     padding: 0.1em 0.45em;
-    border-radius: 2px;
+    border-radius: 3px;
     text-transform: uppercase;
     letter-spacing: 0.04em;
   }
@@ -532,7 +532,7 @@
   .results-table {
     width: 100%;
     border-collapse: collapse;
-    font-size: 0.68rem;
+    font-size: 1.2rem;
   }
 
   .results-table thead tr {
@@ -540,8 +540,8 @@
   }
   .results-table th {
     text-align: left;
-    padding: 0.3rem 0.75rem;
-    font-size: 0.6rem;
+    padding: 0.5rem 1.3rem;
+    font-size: 1rem;
     font-weight: 700;
     letter-spacing: 0.06em;
     text-transform: uppercase;
@@ -549,7 +549,7 @@
     border-bottom: 1px solid rgba(255,255,255,0.05);
   }
   .results-table td {
-    padding: 0.3rem 0.75rem;
+    padding: 0.5rem 1.3rem;
     vertical-align: top;
     border-bottom: 1px solid rgba(255,255,255,0.03);
     color: #bbb;
@@ -560,37 +560,37 @@
   .res-fail td { background: rgba(60,0,0,0.15); }
 
   .res-badge {
-    font-size: 0.6rem;
+    font-size: 1rem;
     font-weight: 700;
     padding: 0.1em 0.4em;
-    border-radius: 2px;
+    border-radius: 3px;
     text-transform: uppercase;
   }
   .res-badge.res-pass { background: #1a4d1a; color: #5ddb5d; }
   .res-badge.res-fail { background: #4d1a1a; color: var(--red); }
   .res-badge.res-other { background: #2a2a2a; color: #666; }
 
-  .result-tester { color: #aaa; white-space: nowrap; font-size: 0.65rem; }
+  .result-tester { color: #aaa; white-space: nowrap; font-size: 1.15rem; }
   .result-name   { color: #ccc; }
-  .result-detail { display: flex; align-items: flex-start; flex-wrap: wrap; gap: 0.3rem; }
+  .result-detail { display: flex; align-items: flex-start; flex-wrap: wrap; gap: 0.5rem; }
   .result-comment { color: #999; font-style: italic; }
 
   /* ── Shared chips / tags ──────────────────────────────────── */
-  .chip-pass { background: #1a4d1a; color: #5ddb5d; padding: 0.1em 0.35em; border-radius: 2px; font-size: 0.65rem; font-weight: 700; }
-  .chip-fail { background: #4d1a1a; color: var(--red);   padding: 0.1em 0.35em; border-radius: 2px; font-size: 0.65rem; font-weight: 700; }
-  .chip-prog { background: #1a2d4d; color: var(--blue);  padding: 0.1em 0.35em; border-radius: 2px; font-size: 0.65rem; font-weight: 700; }
-  .chip-skip { background: #2a2a2a; color: var(--text-muted); padding: 0.1em 0.35em; border-radius: 2px; font-size: 0.65rem; font-weight: 700; }
+  .chip-pass { background: #1a4d1a; color: #5ddb5d; padding: 0.1em 0.35em; border-radius: 3px; font-size: 1.15rem; font-weight: 700; }
+  .chip-fail { background: #4d1a1a; color: var(--red);   padding: 0.1em 0.35em; border-radius: 3px; font-size: 1.15rem; font-weight: 700; }
+  .chip-prog { background: #1a2d4d; color: var(--blue);  padding: 0.1em 0.35em; border-radius: 3px; font-size: 1.15rem; font-weight: 700; }
+  .chip-skip { background: #2a2a2a; color: var(--text-muted); padding: 0.1em 0.35em; border-radius: 3px; font-size: 1.15rem; font-weight: 700; }
 
   .bug-tag {
     background: #2d1a00;
     color: #cc7700;
     border: 1px solid #5a3500;
     padding: 0.1em 0.4em;
-    border-radius: 3px;
-    font-size: 0.65rem;
+    border-radius: 5px;
+    font-size: 1.15rem;
     font-family: monospace;
   }
-  .bug-tag.small { font-size: 0.6rem; }
+  .bug-tag.small { font-size: 1rem; }
 
   .mono  { font-family: monospace; }
   .dim   { color: #555; }
