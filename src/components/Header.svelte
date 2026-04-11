@@ -76,7 +76,7 @@
     align-items: center;
     gap: 1.35rem;
     padding: 0 1.35rem;
-    height: 50px;
+    height: 60px;
     background: var(--bg-panel);
     border-bottom: 2px solid var(--accent);
   }
@@ -88,10 +88,10 @@
     flex-shrink: 0;
   }
 
-  .logo img { height: 25px; }
+  .logo img { height: 30px; }
 
   .title {
-    font-size: 0.9rem;
+    font-size: 1.08rem;
     font-weight: 700;
     letter-spacing: 0.12em;
     text-transform: uppercase;
@@ -116,21 +116,21 @@
     color: var(--text);
     padding: 0.2rem 0.55rem;
     border-radius: 3px;
-    font-size: 0.8rem;
+    font-size: 0.96rem;
     font-weight: 700;
     font-family: inherit;
     cursor: pointer;
   }
 
   .release-name {
-    font-size: 0.8rem;
+    font-size: 0.96rem;
     font-weight: 700;
     color: var(--text);
   }
 
   .milestone-meta {
     color: var(--text-muted);
-    font-size: 0.73rem;
+    font-size: 0.88rem;
   }
 
   .right {
@@ -141,7 +141,7 @@
   }
 
   .clock {
-    font-size: 1.1rem;
+    font-size: 1.32rem;
     font-weight: 700;
     font-variant-numeric: tabular-nums;
     color: #ccc;

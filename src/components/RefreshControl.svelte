@@ -77,11 +77,11 @@
 
   .last-updated {
     color: var(--text-muted);
-    font-size: 0.75rem;
+    font-size: 0.9rem;
   }
 
   .countdown {
-    font-size: 0.75rem;
+    font-size: 0.9rem;
     font-weight: 600;
     color: var(--accent);
     font-variant-numeric: tabular-nums;
@@ -129,7 +129,7 @@
   }
 
   .toggle-label {
-    font-size: 0.75rem;
+    font-size: 0.9rem;
     color: var(--text-muted);
   }
 
@@ -140,7 +140,7 @@
     color: var(--text);
     padding: 0.2rem 0.4rem;
     border-radius: 3px;
-    font-size: 0.75rem;
+    font-size: 0.9rem;
     cursor: pointer;
   }
 
@@ -152,7 +152,7 @@
     padding: 0.3rem 0.8rem;
     border-radius: 3px;
     cursor: pointer;
-    font-size: 0.8125rem;
+    font-size: 0.975rem;
     transition: border-color 0.15s, color 0.15s;
     font-family: inherit;
   }
