@@ -66,9 +66,17 @@
     box-shadow: 0 3px 10px rgba(0,0,0,0.4);
   }
 
-  .chip.approved { border-left-color: var(--green-border); }
-  .chip.failed   { border-left-color: var(--red-border);   }
-  .chip.default  { border-left-color: #3a3a3a;             }
+  .chip.approved {
+    background: var(--green-bg);
+    border-color: var(--green-border);
+    border-left-color: var(--green);
+  }
+  .chip.failed {
+    background: var(--red-bg);
+    border-color: var(--red-border);
+    border-left-color: var(--red);
+  }
+  .chip.default  { border-left-color: #3a3a3a; }
 
   /* ── Top row: name + status icon ─── */
   .chip-top {
@@ -94,8 +102,8 @@
     font-weight: 700;
     flex-shrink: 0;
   }
-  .chip-icon.approved { color: #5ddb5d; }
-  .chip-icon.failed   { color: var(--red); }
+  .chip-icon.approved { color: var(--green); }
+  .chip-icon.failed   { color: var(--red);   }
 
   /* ── Bottom row: arch + test counts ─── */
   .chip-bottom {
