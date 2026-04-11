@@ -82,23 +82,23 @@
   /* Left rail */
   .rail {
     flex-shrink: 0;
-    width: 68px;
+    width: 88px;
     display: flex;
     flex-direction: column;
     align-items: center;
-    padding-top: 0.5rem;
-    gap: 0.18rem;
+    padding-top: 0.6rem;
+    gap: 0.28rem;
   }
 
   .rail-dot {
-    width: 7px;
-    height: 7px;
+    width: 9px;
+    height: 9px;
     border-radius: 50%;
     background: var(--lane-color);
   }
 
   .rail-label {
-    font-size: 0.58rem;
+    font-size: 0.78rem;
     font-weight: 700;
     letter-spacing: 0.07em;
     text-transform: uppercase;
@@ -107,7 +107,7 @@
   }
 
   .rail-count {
-    font-size: 0.52rem;
+    font-size: 0.68rem;
     color: #484848;
     font-variant-numeric: tabular-nums;
   }
@@ -117,10 +117,10 @@
     flex: 1;
     display: flex;
     flex-wrap: wrap;
-    gap: 0.3rem;
+    gap: 0.5rem;
     border-left: 1px solid #1e1e1e;
-    padding: 0.2rem 0 0.2rem 0.5rem;
-    min-height: 48px;
+    padding: 0.35rem 0 0.35rem 0.75rem;
+    min-height: 84px;
   }
 
   .empty {

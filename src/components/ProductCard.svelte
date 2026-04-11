@@ -46,13 +46,13 @@
     display: flex;
     flex-direction: column;
     justify-content: space-between;
-    min-width: 128px;
-    max-width: 192px;
-    height: 42px;
-    padding: 0.28rem 0.5rem 0.28rem 0.6rem;
-    border-radius: 4px;
+    min-width: 224px;
+    max-width: 336px;
+    height: 74px;
+    padding: 0.5rem 0.875rem 0.5rem 1rem;
+    border-radius: 7px;
     border: 1px solid #252525;
-    border-left: 3px solid #333;
+    border-left: 4px solid #333;
     background: var(--bg-panel);
     cursor: pointer;
     text-align: left;
@@ -75,12 +75,12 @@
     display: flex;
     justify-content: space-between;
     align-items: baseline;
-    gap: 0.25rem;
+    gap: 0.44rem;
     overflow: hidden;
   }
 
   .chip-name {
-    font-size: 0.7rem;
+    font-size: 1.2rem;
     font-weight: 700;
     color: #ddd;
     white-space: nowrap;
@@ -90,7 +90,7 @@
   }
 
   .chip-icon {
-    font-size: 0.62rem;
+    font-size: 1.1rem;
     font-weight: 700;
     flex-shrink: 0;
   }
@@ -101,21 +101,21 @@
   .chip-bottom {
     display: flex;
     align-items: center;
-    gap: 0.22rem;
+    gap: 0.38rem;
   }
 
   .chip-arch {
-    font-size: 0.58rem;
+    font-size: 1rem;
     color: #555;
     flex-shrink: 0;
-    margin-right: 0.1rem;
+    margin-right: 0.18rem;
   }
 
   .tc {
-    font-size: 0.56rem;
+    font-size: 0.98rem;
     font-weight: 700;
     padding: 0.05em 0.25em;
-    border-radius: 2px;
+    border-radius: 3px;
     line-height: 1;
   }
   .tc.pass { color: #5ddb5d; }
