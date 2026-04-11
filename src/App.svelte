@@ -98,6 +98,7 @@
         const prevKpis = products.length > 0 ? computeKpis(products) : null
         const { products: merged, changed } = diffProducts(products, items)
         if (changed) {
+          playUpdateSound()
           products = merged
           if (prevKpis) {
             const nextKpis = computeKpis(merged)
@@ -125,6 +126,33 @@
       _loading  = false
       loadPhase = null
       if (autoRefresh) _startCountdown()
+    }
+  }
+
+  // ──────────────────────────────────────────────────────────────
+  // Notification sound
+  // ──────────────────────────────────────────────────────────────
+  function playUpdateSound() {
+    try {
+      const ctx = new (window.AudioContext || window.webkitAudioContext)()
+      // Two-tone chime: a quick high note followed by a lower one
+      const tones = [880, 660]
+      tones.forEach((freq, i) => {
+        const osc  = ctx.createOscillator()
+        const gain = ctx.createGain()
+        osc.connect(gain)
+        gain.connect(ctx.destination)
+        osc.type = 'sine'
+        osc.frequency.value = freq
+        const start = ctx.currentTime + i * 0.15
+        gain.gain.setValueAtTime(0, start)
+        gain.gain.linearRampToValueAtTime(0.18, start + 0.02)
+        gain.gain.exponentialRampToValueAtTime(0.001, start + 0.25)
+        osc.start(start)
+        osc.stop(start + 0.25)
+      })
+    } catch {
+      // AudioContext not available — silently skip
     }
   }
 
