@@ -2,7 +2,7 @@
   import ProductCard  from './ProductCard.svelte'
   import ProductModal from './ProductModal.svelte'
 
-  let { products, release = '' } = $props()
+  let { products } = $props()
 
   let selectedProduct = $state(null)
   let gridEl = $state(null)
@@ -51,7 +51,7 @@
 </script>
 
 {#if selectedProduct}
-  <ProductModal product={selectedProduct} {release} onclose={() => selectedProduct = null} />
+  <ProductModal product={selectedProduct} onclose={() => selectedProduct = null} />
 {/if}
 
 {#if products.length === 0}

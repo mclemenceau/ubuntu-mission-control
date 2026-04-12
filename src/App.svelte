@@ -256,7 +256,7 @@
     {:else if loadError}
       <div class="error-msg">Error: {loadError}</div>
     {:else}
-      <ProductGrid {products} release={releases[selectedIndex]?.release ?? ''} />
+      <ProductGrid {products} />
     {/if}
   </div>
 </div>

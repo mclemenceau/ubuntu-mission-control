@@ -3,7 +3,7 @@
   import { fetchBuilds } from '../api/client.js'
   import HistoryPanel from './HistoryPanel.svelte'
 
-  /** @type {{ product: import('../lib/processor.js').Product, release: string, onclose: () => void }} */
+  /** @type {{ product: import('../lib/processor.js').Product, onclose: () => void }} */
   let { product, onclose } = $props()
 
   let builds  = $state([])

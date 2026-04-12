@@ -300,17 +300,19 @@
             </div>
 
             <!-- Status block — clickable on built days -->
-            <!-- svelte-ignore a11y_interactive_supports_focus -->
-            <div class="day-block {sc}"
-                 class:clickable={!!day.artefact}
-                 title="{day.date}{day.artefact ? ' · ' + (day.artefact.status ?? 'UNDECIDED') : ' · no build'}"
-                 role={day.artefact ? 'button' : 'presentation'}
-                 tabindex={day.artefact ? 0 : -1}
-                 onclick={() => { if (day.artefact) selectedDay = i }}
-                 onkeydown={e => { if (day.artefact && (e.key === 'Enter' || e.key === ' ')) selectedDay = i }}
-            >
-              <span class="day-mark {cls}">{mark}</span>
-            </div>
+            {#if day.artefact}
+              <button
+                class="day-block {sc} clickable"
+                title="{day.date} · {day.artefact.status ?? 'UNDECIDED'}"
+                onclick={() => { selectedDay = i }}
+              >
+                <span class="day-mark {cls}">{mark}</span>
+              </button>
+            {:else}
+              <div class="day-block {sc}" title="{day.date} · no build">
+                <span class="day-mark {cls}">{mark}</span>
+              </div>
+            {/if}
 
             <!-- Date label -->
             <div class="day-label" class:today-label={isToday(day.date)}>
@@ -551,10 +553,14 @@
   .day-block {
     width: 32px;
     height: 38px;
+    padding: 0;
+    border: none;
     border-radius: 4px;
     display: flex;
     align-items: center;
     justify-content: center;
+    font-family: inherit;
+    color: inherit;
     font-size: 0.95rem;
     font-weight: 700;
     transition: transform 0.1s, filter 0.1s;
@@ -562,6 +568,10 @@
   }
   .day-block.clickable         { cursor: pointer; }
   .day-block.clickable:hover   { transform: scaleY(1.08); filter: brightness(1.2); }
+  .day-block.clickable:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
 
   .day-block.built { background: #1a4d1a; }
   .day-block.miss  { background: var(--bg-raised); border: 1px solid var(--border-mid); }
