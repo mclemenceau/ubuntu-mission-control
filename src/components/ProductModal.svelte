@@ -10,6 +10,9 @@
   let loading = $state(true)
   let error   = $state(null)
 
+  let showHistory    = $state(false)
+  let viewedArtefact = $state(null)
+
   const FLAVOR_ICONS = {
     edubuntu:         'https://assets.ubuntu.com/v1/a2f090ef-edubuntu-logo.svg',
     kubuntu:          'https://assets.ubuntu.com/v1/d92401b4-kubuntu-logo.svg',
@@ -117,6 +120,17 @@
       </div>
     </div>
 
+    <!-- ── View toggle nav ───────────────────────────────────────── -->
+    <div class="view-nav">
+      <button class="vnav-btn" class:active={!showHistory} onclick={() => showHistory = false}>
+        Latest Build
+      </button>
+      <span class="vnav-sep">|</span>
+      <button class="vnav-btn" class:active={showHistory} onclick={() => showHistory = true}>
+        Show 30 Days History
+      </button>
+    </div>
+
     <!-- ── Artifact details strip ─────────────────────────────── -->
     <div class="details-strip">
       <div class="detail-item">
@@ -125,7 +139,7 @@
       </div>
       <div class="detail-item">
         <span class="dl">Version</span>
-        <span class="dv mono">{product.version ?? '—'}</span>
+        <span class="dv mono">{showHistory ? (viewedArtefact?.version ?? product.version ?? '—') : (product.version ?? '—')}</span>
       </div>
       <div class="detail-item">
         <span class="dl">Architecture</span>
@@ -148,7 +162,7 @@
     </div>
 
     <!-- ── Latest builds (minimal one-liner per build) ──────────── -->
-    {#if !loading && !error && builds.length > 0}
+    {#if !showHistory && !loading && !error && builds.length > 0}
       <div class="builds-strip">
         <span class="builds-label">Latest</span>
         {#each builds as build, bi}
@@ -165,9 +179,9 @@
       </div>
     {/if}
 
-    <!-- ── Unified 30-day history + test detail panel ────────────── -->
+    <!-- ── Test detail + 30-day history ──────────────────────────── -->
     <div class="history-wrap">
-      <HistoryPanel {product} />
+      <HistoryPanel {product} showCalendar={showHistory} onArtefactChange={(a) => viewedArtefact = a} />
     </div>
 
   </div>
@@ -309,6 +323,39 @@
     transition: color 0.15s, background 0.15s;
   }
   .close-btn:hover { color: var(--text-bright); background: var(--surface-hover); }
+
+  /* ── View toggle nav ──────────────────────────────────────── */
+  .view-nav {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.55rem 1.54rem;
+    border-bottom: 1px solid rgba(255,255,255,0.05);
+    background: var(--bg-base);
+    flex-shrink: 0;
+  }
+
+  .vnav-btn {
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 0.85rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    padding: 0.25em 0.55em;
+    border-radius: 4px;
+    transition: color 0.15s, background 0.15s;
+  }
+  .vnav-btn:hover { color: var(--text-normal); background: var(--surface-hover); }
+  .vnav-btn.active { color: var(--accent); background: rgba(255,255,255,0.05); }
+
+  .vnav-sep {
+    color: var(--border-mid);
+    font-size: 0.9rem;
+    user-select: none;
+  }
 
   /* ── Details strip ────────────────────────────────────────── */
   .details-strip {

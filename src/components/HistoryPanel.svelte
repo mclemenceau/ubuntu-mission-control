@@ -2,8 +2,8 @@
   import { onMount } from 'svelte'
   import { fetchArtefact, fetchArtefactVersions, fetchBuilds, fetchTestResults } from '../api/client.js'
 
-  /** @type {{ product: import('../lib/processor.js').Product }} */
-  let { product } = $props()
+  /** @type {{ product: import('../lib/processor.js').Product, showCalendar?: boolean, onArtefactChange?: (a: any) => void }} */
+  let { product, showCalendar = true, onArtefactChange = null } = $props()
 
   let loading     = $state(true)
   let error       = $state(null)
@@ -164,6 +164,9 @@
   // Currently selected day object
   let selDay = $derived(selectedDay !== null ? (days[selectedDay] ?? null) : null)
 
+  // Notify parent whenever the viewed artefact changes (used to update details strip)
+  $effect(() => { onArtefactChange?.(selDay?.artefact ?? null) })
+
   // ── Detail panel helpers ────────────────────────────────────────────
   function parseResultName(name) {
     if (!name) return { tester: null, testName: '—' }
@@ -193,157 +196,164 @@
 </script>
 
 <div class="history-panel">
-  <!-- ── Summary header ──────────────────────────────────────────── -->
-  {#if !loading && !error && rate}
-    <div class="summary">
-      <div class="summary-left">
-        <span class="summary-title">30-day build history</span>
-        <span class="summary-sub">{rate.built} of {rate.total} days built · {rate.approved} approved</span>
-      </div>
-      <div class="rate-wrap">
-        <span class="rate-label" style="color: {rateColor}">{ratePct}%</span>
-        <div class="rate-track">
-          <div class="rate-fill" style="width: {ratePct}%; background: {rateColor}"></div>
+  {#if showCalendar}
+    <!-- ── Summary header ────────────────────────────────────────── -->
+    {#if !loading && !error && rate}
+      <div class="summary">
+        <div class="summary-left">
+          <span class="summary-title">30-day build history</span>
+          <span class="summary-sub">{rate.built} of {rate.total} days built · {rate.approved} approved</span>
         </div>
-        <span class="rate-desc">build rate</span>
-      </div>
-    </div>
-  {/if}
-
-  <!-- ── State messages ──────────────────────────────────────────── -->
-  {#if loading}
-    <div class="hist-state">Loading 30-day history…</div>
-  {:else if error}
-    <div class="hist-state err">Error: {error}</div>
-  {:else if days.every(d => !d.artefact)}
-    <div class="hist-state">No historical data found for this product.</div>
-  {:else}
-    <!-- ── Day columns ──────────────────────────────────────────────── -->
-    <div class="day-grid">
-      {#each days as day, i}
-        {@const sc             = statusClass(day)}
-        {@const { mark, cls } = approvalMark(day)}
-        {@const tl             = testLine(day.tests)}
-        {@const isSelected     = i === selectedDay}
-        <div class="day-col" class:today={isToday(day.date)} class:selected={isSelected}>
-          <!-- Test metrics -->
-          <div class="test-line" class:has-data={!!tl}>
-            {#if tl}
-              {#each tl.split(' ') as chunk}
-                <span class="tl-chip"
-                      class:tl-pass={chunk.endsWith('✓')}
-                      class:tl-fail={chunk.endsWith('✗')}
-                      class:tl-prog={chunk.endsWith('…')}
-                >{chunk}</span>
-              {/each}
-            {:else if day.artefact}
-              <span class="tl-none">—</span>
-            {/if}
+        <div class="rate-wrap">
+          <span class="rate-label" style="color: {rateColor}">{ratePct}%</span>
+          <div class="rate-track">
+            <div class="rate-fill" style="width: {ratePct}%; background: {rateColor}"></div>
           </div>
-
-          <!-- Status block — clickable on built days -->
-          <!-- svelte-ignore a11y_interactive_supports_focus -->
-          <div class="day-block {sc}"
-               class:clickable={!!day.artefact}
-               title="{day.date}{day.artefact ? ' · ' + (day.artefact.status ?? 'UNDECIDED') : ' · no build'}"
-               role={day.artefact ? 'button' : 'presentation'}
-               tabindex={day.artefact ? 0 : -1}
-               onclick={() => { if (day.artefact) selectedDay = i }}
-               onkeydown={e => { if (day.artefact && (e.key === 'Enter' || e.key === ' ')) selectedDay = i }}
-          >
-            <span class="day-mark {cls}">{mark}</span>
-          </div>
-
-          <!-- Date label -->
-          <div class="day-label" class:today-label={isToday(day.date)}>
-            {dayLabel(day.date)}
-          </div>
+          <span class="rate-desc">build rate</span>
         </div>
-      {/each}
-    </div>
-
-    <!-- Legend -->
-    <div class="legend">
-      <span class="leg-item"><span class="leg-swatch built"></span>Built</span>
-      <span class="leg-item"><span class="leg-swatch miss"></span>No build</span>
-      <span class="leg-item"><span class="mark-ok leg-mark">✓</span>Approved</span>
-      <span class="leg-item"><span class="mark-fail leg-mark">✗</span>Not approved</span>
-      <span class="leg-item leg-hint">Click a day to see its test results</span>
-    </div>
-
-    <!-- ── Day detail panel ──────────────────────────────────────── -->
-    {#if selDay}
-      <div class="detail-panel">
-        <!-- Detail header -->
-        <div class="detail-hdr">
-          <div class="detail-hdr-left">
-            <span class="detail-date">{dayLabel(selDay.date)}{isToday(selDay.date) ? ' (today)' : ''}</span>
-            <span class="detail-version">{selDay.artefact?.version ?? '—'}</span>
-            <span class="detail-status-badge {statusBadgeClass(selDay.artefact?.status)}">
-              {STATUS_LABELS[selDay.artefact?.status] ?? '—'}
-            </span>
-          </div>
-          {#if selDay.tests}
-            <div class="detail-counts">
-              {#if selDay.tests.passed}     <span class="chip chip-pass">✓ {selDay.tests.passed}</span>{/if}
-              {#if selDay.tests.failed}     <span class="chip chip-fail">✗ {selDay.tests.failed}</span>{/if}
-              {#if selDay.tests.inProgress} <span class="chip chip-prog">… {selDay.tests.inProgress}</span>{/if}
-              {#if selDay.tests.notStarted} <span class="chip chip-skip">○ {selDay.tests.notStarted}</span>{/if}
-              {#if selDay.tests.passed + selDay.tests.failed + selDay.tests.inProgress + selDay.tests.notStarted === 0}
-                <span class="chip-none">no executions</span>
-              {/if}
-            </div>
-          {/if}
-        </div>
-
-        <!-- Executions + results -->
-        {#if !selDay.builds || selDay.builds.length === 0}
-          <div class="detail-empty">No test executions for this build.</div>
-        {:else}
-          {#each selDay.builds as build}
-            {#each build.test_executions as exec}
-              <div class="det-exec">
-                <div class="det-exec-hdr">
-                  <div class="det-exec-left">
-                    <span class="det-plan">{exec.test_plan ?? 'Test execution'}</span>
-                    {#if exec.environment?.name}
-                      <span class="det-env">{exec.environment.name}</span>
-                    {/if}
-                  </div>
-                  <span class="exec-badge {execStatusClass(exec.status)}">{exec.status ?? '—'}</span>
-                </div>
-
-                {#if exec.results.length === 0}
-                  <div class="det-no-results">No results submitted yet.</div>
-                {:else}
-                  <table class="det-table">
-                    <thead>
-                      <tr>
-                        <th>Tester</th>
-                        <th>Test</th>
-                        <th>Status</th>
-                        <th>Comment</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {#each exec.results as r}
-                        {@const { tester, testName } = parseResultName(r.name)}
-                        <tr class={resultStatusClass(r.status)}>
-                          <td class="det-tester">{tester ?? '—'}</td>
-                          <td class="det-name">{testName}</td>
-                          <td><span class="res-badge {resultStatusClass(r.status)}">{r.status ?? '—'}</span></td>
-                          <td class="det-comment">{r.comment ?? ''}</td>
-                        </tr>
-                      {/each}
-                    </tbody>
-                  </table>
-                {/if}
-              </div>
-            {/each}
-          {/each}
-        {/if}
       </div>
     {/if}
+
+    <!-- ── State messages ──────────────────────────────────────────── -->
+    {#if loading}
+      <div class="hist-state">Loading 30-day history…</div>
+    {:else if error}
+      <div class="hist-state err">Error: {error}</div>
+    {:else if days.every(d => !d.artefact)}
+      <div class="hist-state">No historical data found for this product.</div>
+    {:else}
+      <!-- ── Day columns ────────────────────────────────────────────── -->
+      <div class="day-grid">
+        {#each days as day, i}
+          {@const sc             = statusClass(day)}
+          {@const { mark, cls } = approvalMark(day)}
+          {@const tl             = testLine(day.tests)}
+          {@const isSelected     = i === selectedDay}
+          <div class="day-col" class:today={isToday(day.date)} class:selected={isSelected}>
+            <!-- Test metrics -->
+            <div class="test-line" class:has-data={!!tl}>
+              {#if tl}
+                {#each tl.split(' ') as chunk}
+                  <span class="tl-chip"
+                        class:tl-pass={chunk.endsWith('✓')}
+                        class:tl-fail={chunk.endsWith('✗')}
+                        class:tl-prog={chunk.endsWith('…')}
+                  >{chunk}</span>
+                {/each}
+              {:else if day.artefact}
+                <span class="tl-none">—</span>
+              {/if}
+            </div>
+
+            <!-- Status block — clickable on built days -->
+            <!-- svelte-ignore a11y_interactive_supports_focus -->
+            <div class="day-block {sc}"
+                 class:clickable={!!day.artefact}
+                 title="{day.date}{day.artefact ? ' · ' + (day.artefact.status ?? 'UNDECIDED') : ' · no build'}"
+                 role={day.artefact ? 'button' : 'presentation'}
+                 tabindex={day.artefact ? 0 : -1}
+                 onclick={() => { if (day.artefact) selectedDay = i }}
+                 onkeydown={e => { if (day.artefact && (e.key === 'Enter' || e.key === ' ')) selectedDay = i }}
+            >
+              <span class="day-mark {cls}">{mark}</span>
+            </div>
+
+            <!-- Date label -->
+            <div class="day-label" class:today-label={isToday(day.date)}>
+              {dayLabel(day.date)}
+            </div>
+          </div>
+        {/each}
+      </div>
+
+      <!-- Legend -->
+      <div class="legend">
+        <span class="leg-item"><span class="leg-swatch built"></span>Built</span>
+        <span class="leg-item"><span class="leg-swatch miss"></span>No build</span>
+        <span class="leg-item"><span class="mark-ok leg-mark">✓</span>Approved</span>
+        <span class="leg-item"><span class="mark-fail leg-mark">✗</span>Not approved</span>
+        <span class="leg-item leg-hint">Click a day to see its test results</span>
+      </div>
+    {/if}
+
+  {:else if loading}
+    <div class="hist-state">Loading test data…</div>
+  {:else if error}
+    <div class="hist-state err">Error: {error}</div>
+  {/if}
+
+  <!-- ── Day detail panel — shown in both Latest Build and History modes ── -->
+  {#if !loading && !error && selDay}
+    <div class="detail-panel">
+      <!-- Detail header -->
+      <div class="detail-hdr">
+        <div class="detail-hdr-left">
+          <span class="detail-date">{dayLabel(selDay.date)}{isToday(selDay.date) ? ' (today)' : ''}</span>
+          <span class="detail-version">{selDay.artefact?.version ?? '—'}</span>
+          <span class="detail-status-badge {statusBadgeClass(selDay.artefact?.status)}">
+            {STATUS_LABELS[selDay.artefact?.status] ?? '—'}
+          </span>
+        </div>
+        {#if selDay.tests}
+          <div class="detail-counts">
+            {#if selDay.tests.passed}     <span class="chip chip-pass">✓ {selDay.tests.passed}</span>{/if}
+            {#if selDay.tests.failed}     <span class="chip chip-fail">✗ {selDay.tests.failed}</span>{/if}
+            {#if selDay.tests.inProgress} <span class="chip chip-prog">… {selDay.tests.inProgress}</span>{/if}
+            {#if selDay.tests.notStarted} <span class="chip chip-skip">○ {selDay.tests.notStarted}</span>{/if}
+            {#if selDay.tests.passed + selDay.tests.failed + selDay.tests.inProgress + selDay.tests.notStarted === 0}
+              <span class="chip-none">no executions</span>
+            {/if}
+          </div>
+        {/if}
+      </div>
+
+      <!-- Executions + results -->
+      {#if !selDay.builds || selDay.builds.length === 0}
+        <div class="detail-empty">No test executions for this build.</div>
+      {:else}
+        {#each selDay.builds as build}
+          {#each build.test_executions as exec}
+            <div class="det-exec">
+              <div class="det-exec-hdr">
+                <div class="det-exec-left">
+                  <span class="det-plan">{exec.test_plan ?? 'Test execution'}</span>
+                  {#if exec.environment?.name}
+                    <span class="det-env">{exec.environment.name}</span>
+                  {/if}
+                </div>
+                <span class="exec-badge {execStatusClass(exec.status)}">{exec.status ?? '—'}</span>
+              </div>
+
+              {#if exec.results.length === 0}
+                <div class="det-no-results">No results submitted yet.</div>
+              {:else}
+                <table class="det-table">
+                  <thead>
+                    <tr>
+                      <th>Tester</th>
+                      <th>Test</th>
+                      <th>Status</th>
+                      <th>Comment</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {#each exec.results as r}
+                      {@const { tester, testName } = parseResultName(r.name)}
+                      <tr class={resultStatusClass(r.status)}>
+                        <td class="det-tester">{tester ?? '—'}</td>
+                        <td class="det-name">{testName}</td>
+                        <td><span class="res-badge {resultStatusClass(r.status)}">{r.status ?? '—'}</span></td>
+                        <td class="det-comment">{r.comment ?? ''}</td>
+                      </tr>
+                    {/each}
+                  </tbody>
+                </table>
+              {/if}
+            </div>
+          {/each}
+        {/each}
+      {/if}
+    </div>
   {/if}
 </div>
 
