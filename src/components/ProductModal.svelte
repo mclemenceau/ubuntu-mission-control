@@ -1,23 +1,14 @@
 <script>
   import { onMount } from 'svelte'
-  import { fetchBuilds, fetchTestResults } from '../api/client.js'
+  import { fetchBuilds } from '../api/client.js'
   import HistoryPanel from './HistoryPanel.svelte'
 
   /** @type {{ product: import('../lib/processor.js').Product, release: string, onclose: () => void }} */
-  let { product, release = '', onclose } = $props()
+  let { product, onclose } = $props()
 
   let builds  = $state([])
   let loading = $state(true)
   let error   = $state(null)
-
-  // Tab: 'builds' | 'history'. History panel mounts lazily on first switch.
-  let activeTab     = $state('builds')
-  let historyMounted = $state(false)
-
-  function switchTab(tab) {
-    activeTab = tab
-    if (tab === 'history') historyMounted = true
-  }
 
   const FLAVOR_ICONS = {
     edubuntu:         'https://assets.ubuntu.com/v1/a2f090ef-edubuntu-logo.svg',
@@ -52,41 +43,16 @@
     UNDECIDED:        '? Undecided',
   }
 
+  // Only APPROVED and MARKED_AS_FAILED colour the header; everything else is neutral.
   let cardClass = $derived(
     product.status === 'APPROVED'           ? 'approved'
     : product.status === 'MARKED_AS_FAILED' ? 'failed'
-    : (product.ageDays ?? 99) > 7          ? 'stale'
-    : 'age'
+    : 'neutral'
   )
-
-  function ageVars(ageDays) {
-    if (ageDays === null || ageDays > 7) {
-      return '--age-border:#2a2a2a; --age-bg:#0c0c10; --age-badge:transparent; --age-text:#555'
-    }
-    const t = ageDays / 7
-    const h = Math.round(140 - t * 110)
-    return [
-      `--age-border: hsl(${h},85%,${Math.round(60 - t * 20)}%)`,
-      `--age-bg:     hsl(${h},70%,${Math.round(18 - t * 10)}%)`,
-      `--age-badge:  hsl(${h},60%,${Math.round(22 - t * 12)}%)`,
-      `--age-text:   hsl(${h},85%,${Math.round(78 - t * 18)}%)`,
-    ].join('; ')
-  }
-
-  let cardStyle = $derived(ageVars(product.ageDays))
 
   onMount(async () => {
     try {
-      const rawBuilds = await fetchBuilds(product.id)
-      builds = await Promise.all(rawBuilds.map(async b => ({
-        ...b,
-        test_executions: await Promise.all(
-          (b.test_executions ?? []).map(async te => ({
-            ...te,
-            results: await fetchTestResults(te.id).catch(() => []),
-          }))
-        ),
-      })))
+      builds = await fetchBuilds(product.id)
     } catch (e) {
       error = e.message
     } finally {
@@ -102,31 +68,15 @@
     if (e.key === 'Escape') onclose()
   }
 
-  function execStatusClass(status) {
-    if (!status) return ''
-    if (status === 'PASSED')                                   return 'exec-passed'
-    if (['FAILED', 'ENDED_PREMATURELY'].includes(status))     return 'exec-failed'
-    if (status === 'IN_PROGRESS')                              return 'exec-progress'
-    return 'exec-pending'
-  }
-
-  function resultStatusClass(status) {
-    if (status === 'PASSED') return 'res-pass'
-    if (status === 'FAILED') return 'res-fail'
-    return 'res-other'
-  }
-
-  /** "patriciasd - PowerVM - POWER10 Virtual Media" → { tester: "patriciasd", testName: "PowerVM - POWER10 Virtual Media" } */
-  function parseResultName(name) {
-    if (!name) return { tester: null, testName: '—' }
-    const idx = name.indexOf(' - ')
-    if (idx === -1) return { tester: null, testName: name }
-    return { tester: name.slice(0, idx), testName: name.slice(idx + 3) }
-  }
-
-  /** Collect unique testers from an execution's results. */
-  function execTesters(results) {
-    return [...new Set(results.map(r => parseResultName(r.name).tester).filter(Boolean))]
+  /** Return the image folder URL from the first ci_link found in any test execution. */
+  function getBuildFolderLink(build) {
+    for (const te of build.test_executions ?? []) {
+      if (te.ci_link) {
+        const lastSlash = te.ci_link.lastIndexOf('/')
+        return lastSlash > 0 ? te.ci_link.slice(0, lastSlash + 1) : null
+      }
+    }
+    return null
   }
 </script>
 
@@ -134,7 +84,7 @@
 
 <!-- svelte-ignore a11y_click_events_have_key_events -->
 <div class="backdrop" onclick={onBackdropClick} role="presentation">
-  <div class="modal" style={cardStyle} role="dialog" aria-modal="true">
+  <div class="modal" role="dialog" aria-modal="true">
 
     <!-- ── Header ─────────────────────────────────────────────── -->
     <div class="modal-header {cardClass}">
@@ -159,7 +109,7 @@
       <div class="header-right">
         <span class="hbadge {cardClass}">{STATUS_LABELS[product.status] ?? '—'}</span>
         {#if product.ageDays !== null}
-          <span class="age-chip" style="color:var(--age-text)">
+          <span class="age-chip">
             {product.ageDays === 0 ? 'built today' : `${product.ageDays}d old`}
           </span>
         {/if}
@@ -169,6 +119,10 @@
 
     <!-- ── Artifact details strip ─────────────────────────────── -->
     <div class="details-strip">
+      <div class="detail-item">
+        <span class="dl">Release</span>
+        <span class="dv">{product.release || '—'}</span>
+      </div>
       <div class="detail-item">
         <span class="dl">Version</span>
         <span class="dv mono">{product.version ?? '—'}</span>
@@ -180,18 +134,6 @@
       <div class="detail-item">
         <span class="dl">Type</span>
         <span class="dv">{product.type || '—'}</span>
-      </div>
-      <div class="detail-item">
-        <span class="dl">Tests</span>
-        <span class="dv">
-          {#if product.tests.passed > 0}<span class="chip-pass">✓ {product.tests.passed}</span>{/if}
-          {#if product.tests.failed > 0}<span class="chip-fail">✗ {product.tests.failed}</span>{/if}
-          {#if product.tests.inProgress > 0}<span class="chip-prog">… {product.tests.inProgress}</span>{/if}
-          {#if product.tests.notStarted > 0}<span class="chip-skip">○ {product.tests.notStarted}</span>{/if}
-          {#if product.tests.passed + product.tests.failed + product.tests.inProgress + product.tests.notStarted === 0}
-            <span class="dim">none</span>
-          {/if}
-        </span>
       </div>
       {#if product.bugs.length > 0}
         <div class="detail-item full">
@@ -205,114 +147,29 @@
       {/if}
     </div>
 
-    <!-- ── Tab bar ──────────────────────────────────────────── -->
-    <div class="tab-bar">
-      <button
-        class="tab-btn"
-        class:active={activeTab === 'builds'}
-        onclick={() => switchTab('builds')}
-      >Builds</button>
-      <button
-        class="tab-btn"
-        class:active={activeTab === 'history'}
-        onclick={() => switchTab('history')}
-      >30-day History</button>
-    </div>
-
-    <!-- ── History panel (lazy) ──────────────────────────────── -->
-    {#if historyMounted}
-      <div class:hidden={activeTab !== 'history'} class="history-wrap">
-        <HistoryPanel {product} {release} />
-      </div>
-    {/if}
-
-    <!-- ── Build / test-run body ──────────────────────────────── -->
-    <div class="modal-body" class:hidden={activeTab !== 'builds'}>
-      {#if loading}
-        <div class="state-msg">Loading build details…</div>
-      {:else if error}
-        <div class="state-msg err">Error: {error}</div>
-      {:else if builds.length === 0}
-        <div class="state-msg">No builds found for this artifact.</div>
-      {:else}
+    <!-- ── Latest builds (minimal one-liner per build) ──────────── -->
+    {#if !loading && !error && builds.length > 0}
+      <div class="builds-strip">
+        <span class="builds-label">Latest</span>
         {#each builds as build, bi}
-          <div class="build-block">
-            <div class="build-title">
-              Build {bi + 1}
-              {#if build.architecture} · <span class="mono">{build.architecture}</span>{/if}
-              {#if build.revision}     · <span class="mono dim">{build.revision}</span>{/if}
-              {#if build.status}       · <span class="build-status">{build.status}</span>{/if}
-            </div>
-
-            {#if (build.test_executions ?? []).length === 0}
-              <div class="no-exec">No test executions for this build.</div>
-            {:else}
-              {#each build.test_executions as exec}
-                <div class="exec-block">
-                  <div class="exec-header">
-                    <div class="exec-header-left">
-                      <span class="exec-plan">{exec.test_plan ?? 'Test execution'}</span>
-                      {#if exec.environment?.name}
-                        <span class="exec-env">{exec.environment.name}</span>
-                      {/if}
-                      {#each execTesters(exec.results) as tester}
-                        <span class="exec-user" title="Tester">👤 {tester}</span>
-                      {/each}
-                      {#if exec.ci_link}
-                        <a class="exec-link"
-                           href={exec.ci_link.slice(0, exec.ci_link.lastIndexOf('/') + 1)}
-                           target="_blank"
-                           rel="noopener noreferrer"
-                           title="Open artifact folder">↗ folder</a>
-                      {/if}
-                      {#each exec.relevant_links ?? [] as link}
-                        <a class="exec-link" href={link.url} target="_blank" rel="noopener noreferrer">{link.label}</a>
-                      {/each}
-                    </div>
-                    <span class="exec-badge {execStatusClass(exec.status)}">{exec.status ?? '—'}</span>
-                  </div>
-
-                  {#if exec.results.length === 0}
-                    <div class="no-results">No test results submitted yet.</div>
-                  {:else}
-                    <table class="results-table">
-                      <thead>
-                        <tr>
-                          <th>Tester</th>
-                          <th>Test</th>
-                          <th>Status</th>
-                          <th>Comment / Issues</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {#each exec.results as r}
-                          {@const { tester, testName } = parseResultName(r.name)}
-                          <tr class={resultStatusClass(r.status)}>
-                            <td class="result-tester">{tester ?? '—'}</td>
-                            <td class="result-name">{testName}</td>
-                            <td>
-                              <span class="res-badge {resultStatusClass(r.status)}">{r.status ?? '—'}</span>
-                            </td>
-                            <td class="result-detail">
-                              {#if r.comment}<span class="result-comment">{r.comment}</span>{/if}
-                              {#each r.issues ?? [] as { issue }}
-                                {#if issue?.key}
-                                  <span class="bug-tag small">LP#{issue.key}</span>
-                                {/if}
-                              {/each}
-                            </td>
-                          </tr>
-                        {/each}
-                      </tbody>
-                    </table>
-                  {/if}
-                </div>
-              {/each}
+          {@const folderLink = getBuildFolderLink(build)}
+          <div class="build-line">
+            {#if builds.length > 1}<span class="build-num">#{bi + 1}</span>{/if}
+            {#if build.architecture}<span class="build-arch">{build.architecture}</span>{/if}
+            {#if build.revision}<span class="build-rev">{build.revision}</span>{/if}
+            {#if folderLink}
+              <a class="build-link" href={folderLink} target="_blank" rel="noopener noreferrer">↗ source</a>
             {/if}
           </div>
         {/each}
-      {/if}
+      </div>
+    {/if}
+
+    <!-- ── Unified 30-day history + test detail panel ────────────── -->
+    <div class="history-wrap">
+      <HistoryPanel {product} />
     </div>
+
   </div>
 </div>
 
@@ -355,8 +212,7 @@
 
   .modal-header.approved { background: var(--green-bg);  border-bottom-color: var(--green-border); }
   .modal-header.failed   { background: var(--red-bg);    border-bottom-color: var(--red-border); }
-  .modal-header.age      { background: var(--age-bg);    border-bottom-color: var(--age-border); }
-  .modal-header.stale    { background: var(--bg-base); border-bottom-color: var(--border-subtle); }
+  .modal-header.neutral  { background: var(--bg-base);   border-bottom-color: var(--border-subtle); }
 
   .header-left  { display: flex; flex-direction: row; align-items: center; gap: 0.88rem; min-width: 0; }
 
@@ -432,13 +288,13 @@
   }
   .hbadge.approved { background: var(--green-border); color: #5ddb5d; }
   .hbadge.failed   { background: var(--red-border);   color: var(--red); }
-  .hbadge.age      { background: var(--age-badge);    color: var(--age-text); }
-  .hbadge.stale    { background: transparent; color: var(--text-muted); }
+  .hbadge.neutral  { background: transparent;         color: var(--text-muted); }
 
   .age-chip {
     font-size: 1rem;
     font-family: monospace;
     font-weight: 700;
+    color: var(--text-muted);
   }
 
   .close-btn {
@@ -459,7 +315,7 @@
     display: flex;
     flex-wrap: wrap;
     gap: 0.77rem 2.2rem;
-    padding: 0.97rem 1.54rem;
+    padding: 0.77rem 1.54rem;
     border-bottom: 1px solid rgba(255,255,255,0.05);
     flex-shrink: 0;
   }
@@ -472,14 +328,14 @@
   .detail-item.full { flex-basis: 100%; }
 
   .dl {
-    font-size: 0.88rem;
+    font-size: 0.82rem;
     font-weight: 700;
     letter-spacing: 0.06em;
     text-transform: uppercase;
     color: var(--text-dim);
   }
   .dv {
-    font-size: 1.06rem;
+    font-size: 1rem;
     color: var(--text-normal);
     display: flex;
     align-items: center;
@@ -487,205 +343,55 @@
     flex-wrap: wrap;
   }
 
-  /* ── Tab bar ─────────────────────────────────────────────── */
-  .tab-bar {
-    display: flex;
-    gap: 0;
-    border-bottom: 1px solid rgba(255,255,255,0.07);
-    flex-shrink: 0;
-    padding: 0 1.54rem;
-  }
-
-  .tab-btn {
-    background: none;
-    border: none;
-    border-bottom: 2px solid transparent;
-    color: var(--text-muted);
-    font-size: 0.975rem;
-    font-family: inherit;
-    font-weight: 600;
-    padding: 0.6rem 1.1rem 0.55rem;
-    cursor: pointer;
-    transition: color 0.15s, border-color 0.15s;
-    margin-bottom: -1px;
-  }
-  .tab-btn:hover { color: var(--text-normal); }
-  .tab-btn.active {
-    color: var(--accent);
-    border-bottom-color: var(--accent);
-  }
-
-  .hidden { display: none; }
-
-  .history-wrap {
-    overflow-y: auto;
-    flex: 1;
-  }
-
-  /* ── Body ─────────────────────────────────────────────────── */
-  .modal-body {
-    overflow-y: auto;
-    flex: 1;
-    padding: 1.14rem 1.54rem;
-    display: flex;
-    flex-direction: column;
-    gap: 1.14rem;
-  }
-
-  .state-msg {
-    font-size: 1.23rem;
-    color: var(--text-dim);
-    padding: 1.54rem 0;
-    text-align: center;
-  }
-  .state-msg.err { color: var(--red); }
-
-  /* ── Build block ──────────────────────────────────────────── */
-  .build-block {
-    border: 1px solid rgba(255,255,255,0.07);
-    border-radius: 8px;
-    overflow: hidden;
-  }
-
-  .build-title {
-    font-size: 1.06rem;
-    font-weight: 700;
-    letter-spacing: 0.04em;
-    text-transform: uppercase;
-    color: var(--text-dim);
-    padding: 0.62rem 1.14rem;
-    background: var(--surface-faint);
-    border-bottom: 1px solid var(--border-faint);
-  }
-
-  .build-status { color: var(--accent); }
-
-  .no-exec, .no-results {
-    font-size: 1.06rem;
-    color: var(--text-dim);
-    font-style: italic;
-    padding: 0.77rem 1.14rem;
-  }
-
-  /* ── Exec block ───────────────────────────────────────────── */
-  .exec-block {
-    border-top: 1px solid rgba(255,255,255,0.04);
-  }
-  .exec-block:first-child { border-top: none; }
-
-  .exec-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 0.77rem;
-    padding: 0.7rem 1.14rem;
-    background: var(--surface-shade);
-  }
-
-  .exec-header-left {
+  /* ── Latest builds strip ──────────────────────────────────── */
+  .builds-strip {
     display: flex;
     align-items: center;
     flex-wrap: wrap;
-    gap: 0.62rem;
-    flex: 1;
-    min-width: 0;
-  }
-
-  .exec-plan {
-    font-size: 1.06rem;
-    font-weight: 600;
-    color: var(--text-soft);
-  }
-
-  .exec-env {
-    font-size: 1rem;
-    color: var(--text-muted);
-    font-style: italic;
-  }
-
-  .exec-user {
-    font-size: 1rem;
-    color: var(--text-muted);
+    gap: 0.4rem 1.1rem;
+    padding: 0.55rem 1.54rem;
+    border-bottom: 1px solid rgba(255,255,255,0.05);
+    flex-shrink: 0;
     background: var(--surface-faint);
-    padding: 0.05em 0.35em;
-    border-radius: 2px;
   }
 
-  .exec-link {
+  .builds-label {
+    font-size: 0.78rem;
+    font-weight: 700;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    margin-right: 0.3rem;
+  }
+
+  .build-line {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
     font-size: 0.97rem;
+    color: var(--text-muted);
+  }
+
+  .build-num  { font-weight: 700; color: var(--text-dim); }
+  .build-arch { font-family: monospace; color: var(--text-soft); }
+  .build-rev  { font-family: monospace; font-size: 0.88rem; color: var(--text-dim); }
+
+  .build-link {
+    font-size: 0.9rem;
     color: var(--accent);
     text-decoration: none;
     opacity: 0.75;
     transition: opacity 0.15s;
   }
-  .exec-link:hover { opacity: 1; }
+  .build-link:hover { opacity: 1; }
 
-  .exec-badge {
-    font-size: 0.88rem;
-    font-weight: 700;
-    padding: 0.1em 0.45em;
-    border-radius: 2px;
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
-  }
-  .exec-passed  { background: #1a4d1a; color: #5ddb5d; }
-  .exec-failed  { background: #4d1a1a; color: var(--red); }
-  .exec-progress{ background: #1a2d4d; color: var(--blue); }
-  .exec-pending { background: var(--bg-raised); color: var(--text-muted); }
-
-  /* ── Results table ────────────────────────────────────────── */
-  .results-table {
-    width: 100%;
-    border-collapse: collapse;
-    font-size: 1.06rem;
+  /* ── History wrap (fills remaining space, scrollable) ─────── */
+  .history-wrap {
+    overflow-y: auto;
+    flex: 1;
   }
 
-  .results-table thead tr {
-    background: rgba(0,0,0,0.2);
-  }
-  .results-table th {
-    text-align: left;
-    padding: 0.44rem 1.14rem;
-    font-size: 0.88rem;
-    font-weight: 700;
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
-    color: var(--text-dim);
-    border-bottom: 1px solid var(--border-faint);
-  }
-  .results-table td {
-    padding: 0.44rem 1.14rem;
-    vertical-align: top;
-    border-bottom: 1px solid var(--border-subtle);
-    color: var(--text-soft);
-  }
-  .results-table tr:last-child td { border-bottom: none; }
-
-  .res-pass td { background: rgba(0,60,0,0.15); }
-  .res-fail td { background: rgba(60,0,0,0.15); }
-
-  .res-badge {
-    font-size: 0.88rem;
-    font-weight: 700;
-    padding: 0.1em 0.4em;
-    border-radius: 2px;
-    text-transform: uppercase;
-  }
-  .res-badge.res-pass { background: #1a4d1a; color: #5ddb5d; }
-  .res-badge.res-fail { background: #4d1a1a; color: var(--red); }
-  .res-badge.res-other { background: var(--bg-raised); color: var(--text-muted); }
-
-  .result-tester { color: var(--text-muted); white-space: nowrap; font-size: 1rem; }
-  .result-name   { color: var(--text-normal); }
-  .result-detail { display: flex; align-items: flex-start; flex-wrap: wrap; gap: 0.44rem; }
-  .result-comment { color: var(--text-muted); font-style: italic; }
-
-  /* ── Shared chips / tags ──────────────────────────────────── */
-  .chip-pass { background: #1a4d1a; color: #5ddb5d; padding: 0.1em 0.35em; border-radius: 2px; font-size: 1rem; font-weight: 700; }
-  .chip-fail { background: #4d1a1a; color: var(--red);   padding: 0.1em 0.35em; border-radius: 2px; font-size: 1rem; font-weight: 700; }
-  .chip-prog { background: #1a2d4d; color: var(--blue);  padding: 0.1em 0.35em; border-radius: 2px; font-size: 1rem; font-weight: 700; }
-  .chip-skip { background: #2a2a2a; color: var(--text-muted); padding: 0.1em 0.35em; border-radius: 2px; font-size: 1rem; font-weight: 700; }
-
+  /* ── Shared tags ──────────────────────────────────────────── */
   .bug-tag {
     background: #2d1a00;
     color: #cc7700;
@@ -695,8 +401,6 @@
     font-size: 1rem;
     font-family: monospace;
   }
-  .bug-tag.small { font-size: 0.88rem; }
 
-  .mono  { font-family: monospace; }
-  .dim   { color: var(--text-dim); }
+  .mono { font-family: monospace; }
 </style>
