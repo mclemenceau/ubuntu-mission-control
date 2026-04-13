@@ -7,6 +7,7 @@
     onClose       = () => {},
     onClearAll    = () => {},
     onDismiss     = () => {},
+    onNotifClick  = () => {},
   } = $props()
 
   const TYPE_META = {
@@ -44,11 +45,17 @@
       {#each notifications as n (n.id)}
         {@const meta = TYPE_META[n.type] ?? { icon: '•', cls: 'muted' }}
         <div class="notif" class:unread={!n.read}>
-          <div class="notif-icon {meta.cls}">{meta.icon}</div>
-          <div class="notif-body">
-            <div class="notif-title">{n.title}</div>
-            <div class="notif-detail" title={n.detail}>{n.detail}</div>
-          </div>
+          <button
+            class="notif-main"
+            onclick={() => onNotifClick(n.productId)}
+            aria-label="Open {n.title}"
+          >
+            <div class="notif-icon {meta.cls}">{meta.icon}</div>
+            <div class="notif-body">
+              <div class="notif-title">{n.title}</div>
+              <div class="notif-detail">{n.detail}</div>
+            </div>
+          </button>
           <div class="notif-right">
             <span class="notif-age">{fmtNotifAge(n.timestamp)}</span>
             <button
@@ -160,13 +167,31 @@
   .notif {
     display: flex;
     align-items: flex-start;
-    gap: 0.65rem;
-    padding: 0.65rem 1rem;
     border-bottom: 1px solid var(--border-subtle);
     transition: background 0.1s;
   }
   .notif:hover { background: var(--surface-hover); }
   .notif.unread { background: var(--surface-faint); }
+
+  .notif-main {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.65rem;
+    flex: 1;
+    min-width: 0;
+    padding: 0.65rem 0.5rem 0.65rem 1rem;
+    background: none;
+    border: none;
+    text-align: left;
+    cursor: pointer;
+    font-family: inherit;
+    color: inherit;
+    border-radius: 0;
+  }
+  .notif-main:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: -2px;
+  }
 
   /* Icon circle */
   .notif-icon {
@@ -211,9 +236,8 @@
   .notif-detail {
     font-size: 0.8rem;
     color: var(--text-muted);
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+    white-space: normal;
+    word-break: break-word;
   }
 
   /* Age + dismiss */
@@ -223,6 +247,7 @@
     align-items: flex-end;
     gap: 0.3rem;
     flex-shrink: 0;
+    padding: 0.65rem 1rem 0.65rem 0;
   }
 
   .notif-age {
@@ -243,6 +268,6 @@
     opacity: 0;
     transition: color 0.1s, opacity 0.1s;
   }
-  .notif:hover .dismiss-btn { opacity: 1; }
+  .notif:hover .dismiss-btn, .notif-main:focus-visible ~ .notif-right .dismiss-btn { opacity: 1; }
   .dismiss-btn:hover { color: var(--red); }
 </style>

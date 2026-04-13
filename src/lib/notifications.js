@@ -20,6 +20,7 @@ export function generateNotifications(changedProducts) {
           id:        `${now}-${p.id}-build-${seq++}`,
           timestamp: now,
           type:      'build',
+          productId: p.id,
           title:     'New build today',
           detail:    `${label} — version ${p.version ?? '?'}`,
         })
@@ -32,6 +33,7 @@ export function generateNotifications(changedProducts) {
         id:        `${now}-${p.id}-approved-${seq++}`,
         timestamp: now,
         type:      'approved',
+        productId: p.id,
         title:     'Build approved',
         detail:    label,
       })
@@ -43,6 +45,7 @@ export function generateNotifications(changedProducts) {
         id:        `${now}-${p.id}-failed-${seq++}`,
         timestamp: now,
         type:      'failed',
+        productId: p.id,
         title:     'Build marked as failed',
         detail:    label,
       })
@@ -54,6 +57,7 @@ export function generateNotifications(changedProducts) {
         id:        `${now}-${p.id}-status-${seq++}`,
         timestamp: now,
         type:      'status',
+        productId: p.id,
         title:     'Status updated',
         detail:    `${label} → ${p.status ?? 'unknown'}`,
       })
@@ -71,6 +75,7 @@ export function generateNotifications(changedProducts) {
           id:        `${now}-${p.id}-pass-${seq++}`,
           timestamp: now,
           type:      'test-pass',
+          productId: p.id,
           title:     `${newPassed} test${newPassed > 1 ? 's' : ''} passed`,
           detail:    `On ${label}`,
         })
@@ -80,6 +85,7 @@ export function generateNotifications(changedProducts) {
           id:        `${now}-${p.id}-fail-${seq++}`,
           timestamp: now,
           type:      'test-fail',
+          productId: p.id,
           title:     `${newFailed} test${newFailed > 1 ? 's' : ''} failed`,
           detail:    `On ${label}`,
         })
@@ -93,6 +99,7 @@ export function generateNotifications(changedProducts) {
           id:        `${now}-${p.id}-bug-${bug}-${seq++}`,
           timestamp: now,
           type:      'bug',
+          productId: p.id,
           title:     'New bug reported',
           detail:    `LP #${bug} on ${label}`,
         })

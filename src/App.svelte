@@ -12,6 +12,7 @@
   import Header from './components/Header.svelte'
   import KpiRow from './components/KpiRow.svelte'
   import ProductGrid from './components/ProductGrid.svelte'
+  import ProductModal from './components/ProductModal.svelte'
   import NotificationPanel from './components/NotificationPanel.svelte'
   import { generateNotifications } from './lib/notifications.js'
 
@@ -23,6 +24,9 @@
   let products   = $state([])
   let kpiDeltas  = $state(null)
   let kpis = $derived(products.length > 0 ? computeKpis(products) : null)
+
+  // ── Modal ─────────────────────────────────────────────────────
+  let selectedProduct = $state(null)
 
   // ── Notifications ──────────────────────────────────────────────
   let notifications = $state([])
@@ -240,6 +244,13 @@
     notifications = notifications.filter(n => n.id !== id)
   }
 
+  function onNotifClick(productId) {
+    const product = products.find(p => p.id === productId)
+    if (!product) return
+    notifOpen = false
+    selectedProduct = product
+  }
+
   // ──────────────────────────────────────────────────────────────
   // Lifecycle
   // ──────────────────────────────────────────────────────────────
@@ -281,7 +292,12 @@
     onClose={closeNotifPanel}
     onClearAll={clearNotifications}
     onDismiss={dismissNotification}
+    {onNotifClick}
   />
+
+  {#if selectedProduct}
+    <ProductModal product={selectedProduct} onclose={() => selectedProduct = null} />
+  {/if}
 
   {#if kpis}
     <KpiRow {kpis} deltas={kpiDeltas} />
@@ -302,7 +318,7 @@
     {:else if loadError}
       <div class="error-msg">Error: {loadError}</div>
     {:else}
-      <ProductGrid {products} />
+      <ProductGrid {products} onSelectProduct={p => selectedProduct = p} />
     {/if}
   </div>
 </div>

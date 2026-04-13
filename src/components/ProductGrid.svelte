@@ -1,10 +1,8 @@
 <script>
-  import ProductCard  from './ProductCard.svelte'
-  import ProductModal from './ProductModal.svelte'
+  import ProductCard from './ProductCard.svelte'
 
-  let { products } = $props()
+  let { products, onSelectProduct } = $props()
 
-  let selectedProduct = $state(null)
   let gridEl = $state(null)
 
   function onGridKeydown(e) {
@@ -50,10 +48,6 @@
   let lanes = $derived(groupByAge(products))
 </script>
 
-{#if selectedProduct}
-  <ProductModal product={selectedProduct} onclose={() => selectedProduct = null} />
-{/if}
-
 {#if products.length === 0}
   <div class="empty">No artifacts found.</div>
 {:else}
@@ -72,7 +66,7 @@
         <!-- Chips -->
         <div class="chips">
           {#each lane.items as product (product.id)}
-            <ProductCard {product} onclick={() => selectedProduct = product} />
+            <ProductCard {product} onclick={() => onSelectProduct(product)} />
           {/each}
         </div>
 
