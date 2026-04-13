@@ -574,7 +574,7 @@
   }
 
   .day-block.built { background: #1a4d1a; }
-  .day-block.miss  { background: var(--bg-raised); border: 1px solid var(--border-mid); }
+  .day-block.miss  { background: #4d1a1a; }
 
   .day-mark { line-height: 1; font-size: 0.9rem; }
   .mark-ok   { color: #5ddb5d; }
@@ -625,7 +625,7 @@
     flex-shrink: 0;
   }
   .leg-swatch.built { background: #1a4d1a; }
-  .leg-swatch.miss  { background: var(--bg-raised); border: 1px solid var(--border-mid); }
+  .leg-swatch.miss  { background: #4d1a1a; }
   .leg-mark { font-size: 0.85rem; font-weight: 700; }
 
   /* ── Detail panel ─────────────────────────────────────────────── */
