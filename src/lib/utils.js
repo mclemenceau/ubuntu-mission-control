@@ -1,6 +1,11 @@
 /** Returns today as YYYYMMDD — matches the artifact version date format. */
 export function todayStr() {
-  return new Date().toISOString().slice(0, 10).replace(/-/g, '')
+  const d = new Date()
+  return (
+    String(d.getFullYear()) +
+    String(d.getMonth() + 1).padStart(2, '0') +
+    String(d.getDate()).padStart(2, '0')
+  )
 }
 
 /**
@@ -27,7 +32,13 @@ export function fmtTime(d) {
 
 /** Formats a Date as YYYY-MM-DD */
 export function fmtDate(d) {
-  return d.toISOString().slice(0, 10)
+  return (
+    String(d.getFullYear()) +
+    '-' +
+    String(d.getMonth() + 1).padStart(2, '0') +
+    '-' +
+    String(d.getDate()).padStart(2, '0')
+  )
 }
 
 /**
