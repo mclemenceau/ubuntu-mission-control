@@ -1,10 +1,11 @@
 # Ubuntu Mission Control
 
-Real-time dashboard for Ubuntu image release tracking.
+Real-time dashboard for Ubuntu release tracking.
 
-During the Ubuntu 26.04 development cycle, the Ubuntu Release Team moved image and test tracking to tests.ubuntu.com. This infrastructure uses Test Observer tooling (canonical/test_observer) and offers a public API.
+During the Ubuntu 26.04 development cycle, the Ubuntu Release Team moved image and test tracking to tests.ubuntu.com. This infrastructure uses Test Observer tooling ([canonical/test_observer](https://github.com/canonical/test_observer)).
+See [Retiring the ISO Tracker! Introducing tests.ubuntu.com](https://discourse.ubuntu.com/t/retiring-the-iso-tracker-introducing-tests-ubuntu-com-for-26-04-lts/78683) for details on the transition.
 
-Ubuntu Mission Control is an experiment that provides advanced visibility into the Ubuntu release process by leveraging the tests.ubuntu.com API.
+Ubuntu Mission Control is an experiment that provides advanced visibility into the Ubuntu release process by leveraging the new tests.ubuntu.com API.
 
 It provides detailed build information and release-critical KPIs, including:
 - Current artifact status (approved/failed/undecided)
@@ -36,7 +37,7 @@ For full feature details and screenshots, see [Feature Guide](docs/FEATURES.md).
 
 ## AI Disclosure
 
-This project has been developed hand in hand with AI Agent like [Claude](https://claude.ai/) (Anthropic) and Copilot.
+This project has been developed hand in hand with AI agents like [Claude](https://claude.ai/) (Anthropic) and [GitHub Copilot](https://github.com/features/copilot).
 
 To maintain code quality and reliability, several quality gates run on every change:
 
