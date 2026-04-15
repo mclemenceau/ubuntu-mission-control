@@ -1,11 +1,22 @@
 const API_BASE = '/api'
+const FETCH_TIMEOUT_MS = 30_000
 
 async function apiFetch(path) {
-  const res = await fetch(`${API_BASE}${path}`, {
-    headers: { 'X-CSRF-Token': '1' },
-  })
-  if (!res.ok) throw new Error(`HTTP ${res.status} — ${path}`)
-  return res.json()
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS)
+  try {
+    const res = await fetch(`${API_BASE}${path}`, {
+      headers: { 'X-CSRF-Token': '1' },
+      signal: controller.signal,
+    })
+    if (!res.ok) throw new Error(`HTTP ${res.status} — ${path}`)
+    return res.json()
+  } catch (err) {
+    if (err.name === 'AbortError') throw new Error(`Timeout — ${path}`)
+    throw err
+  } finally {
+    clearTimeout(timer)
+  }
 }
 
 export const fetchArtefacts = (family = 'image') =>
