@@ -1,4 +1,4 @@
-const API_BASE = '/api'
+const API_BASE = 'https://tests-api.ubuntu.com'
 const FETCH_TIMEOUT_MS = 30_000
 
 async function apiFetch(path) {
