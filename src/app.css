@@ -6,8 +6,8 @@
   --border:     #1e1e2e;
   --border-faint: #222;
   --text:       #e8e8e8;
-  --text-muted: #888;
-  --text-dim:   #555;
+  --text-muted: #ccc;
+  --text-dim:   #999;
   --accent:     #E95420;
   --green:      #34d058;
   --amber:      #f8b500;
@@ -41,8 +41,8 @@ html[data-theme="light"] {
   --border:     #d0d0cc;
   --border-faint: #e0e0dc;
   --text:       #111111;
-  --text-muted: #666666;
-  --text-dim:   #999999;
+  --text-muted: #333333;
+  --text-dim:   #666666;
   --green:      #1a7a2e;
   --amber:      #c07800;
   --red:        #cc2222;
