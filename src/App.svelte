@@ -114,8 +114,8 @@
           const newNotifs = generateNotifications(changedItems)
           if (newNotifs.length > 0) {
             notifications = [...newNotifs.map(n => ({ ...n, read: false })), ...notifications]
+            playUpdateSound()
           }
-          playUpdateSound()
           products = merged
           if (prevKpis) {
             const nextKpis = computeKpis(merged)

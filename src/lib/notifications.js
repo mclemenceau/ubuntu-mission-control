@@ -15,16 +15,14 @@ export function generateNotifications(changedProducts) {
     const label = `${name}${arch}${rel}`
 
     if (p._changeKind === 'new') {
-      if (p.builtToday) {
-        notifications.push({
-          id:        `${now}-${p.id}-build-${seq++}`,
-          timestamp: now,
-          type:      'build',
-          productId: p.id,
-          title:     'New build today',
-          detail:    `${label} — version ${p.version ?? '?'}`,
-        })
-      }
+      notifications.push({
+        id:        `${now}-${p.id}-build-${seq++}`,
+        timestamp: now,
+        type:      'build',
+        productId: p.id,
+        title:     p.builtToday ? 'New build today' : 'New build detected',
+        detail:    `${label} — version ${p.version ?? '?'}`,
+      })
       continue
     }
 
