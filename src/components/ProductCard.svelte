@@ -86,8 +86,9 @@
     {/if}
     <img class="flavor-icon" src={flavorIcon} alt="" aria-hidden="true" />
   </div>
+  <span class="chip-arch">{product.arch}</span>
   <div class="chip-bottom">
-    <span class="chip-arch">{product.arch}</span>
+    <span class="chip-version">{product.version}</span>
     {#if hasTests}
       {#if product.tests.passed}    <span class="tc pass">✓{product.tests.passed}</span>{/if}
       {#if product.tests.failed}    <span class="tc fail">✗{product.tests.failed}</span>{/if}
@@ -185,7 +186,7 @@
     gap: 0.38rem;
   }
 
-  .chip-arch {
+  .chip-arch, .chip-version {
     font-size: 1rem;
     color: var(--text-dim);
     flex-shrink: 0;
