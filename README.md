@@ -7,6 +7,8 @@ See [Retiring the ISO Tracker! Introducing tests.ubuntu.com](https://discourse.u
 
 Ubuntu Mission Control is an experiment that provides advanced visibility into the Ubuntu release process by leveraging the new tests.ubuntu.com API.
 
+Latest published dashboard: [https://mclemenceau.github.io/ubuntu-mission-control/](https://mclemenceau.github.io/ubuntu-mission-control/)
+
 It provides detailed build information and release-critical KPIs, including:
 - Current artifact status (approved/failed/undecided)
 - Build freshness (today vs stale)
