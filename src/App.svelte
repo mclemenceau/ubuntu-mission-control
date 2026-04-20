@@ -27,20 +27,17 @@
 
   // ── Search filter ──────────────────────────────────────────────
   let searchFilter = $state('')
-  let filteredProducts = $derived(
-    searchFilter.trim() === ''
-      ? products
-      : products.filter(p => {
-          const q = searchFilter.trim().toLowerCase()
-          return (
-            (p.name ?? '').toLowerCase().includes(q) ||
-            (p.displayName ?? '').toLowerCase().includes(q) ||
-            (p.type ?? '').toLowerCase().includes(q) ||
-            (p.arch ?? '').toLowerCase().includes(q) ||
-            (p.version ?? '').toLowerCase().includes(q)
-          )
-        })
-  )
+  let filteredProducts = $derived.by(() => {
+    const q = searchFilter.trim().toLowerCase()
+    if (q === '') return products
+    return products.filter(p =>
+      (p.name ?? '').toLowerCase().includes(q) ||
+      (p.displayName ?? '').toLowerCase().includes(q) ||
+      (p.type ?? '').toLowerCase().includes(q) ||
+      (p.arch ?? '').toLowerCase().includes(q) ||
+      (p.version ?? '').toLowerCase().includes(q)
+    )
+  })
 
   // ── Modal ─────────────────────────────────────────────────────
   let selectedProduct = $state(null)
