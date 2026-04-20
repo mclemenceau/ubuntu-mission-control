@@ -1,5 +1,5 @@
 <script>
-  import { onMount } from 'svelte'
+  import { onMount, onDestroy } from 'svelte'
   import RefreshControl from './RefreshControl.svelte'
 
   let {
@@ -26,10 +26,24 @@
   let selectedRelease = $derived(releases[selectedIndex])
 
   let isDark = $state(true)
+  let searchInputEl = $state(null)
+
+  function handleGlobalKeydown(e) {
+    if (e.key !== '/') return
+    const tag = document.activeElement?.tagName
+    if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return
+    e.preventDefault()
+    searchInputEl?.focus()
+  }
 
   onMount(() => {
     isDark = localStorage.getItem('theme') !== 'light'
     document.documentElement.dataset.theme = isDark ? 'dark' : 'light'
+    document.addEventListener('keydown', handleGlobalKeydown)
+  })
+
+  onDestroy(() => {
+    document.removeEventListener('keydown', handleGlobalKeydown)
   })
 
   function toggleTheme() {
@@ -76,9 +90,10 @@
   <div class="search-box">
     <span class="search-icon">⌕</span>
     <input
+      bind:this={searchInputEl}
       class="search-input"
       type="text"
-      placeholder="Filter products…"
+      placeholder="Filter products… ( / )"
       value={searchFilter}
       oninput={e => onSearchChange(e.target.value)}
     />
