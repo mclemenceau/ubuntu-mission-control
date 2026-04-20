@@ -25,6 +25,23 @@
   let kpiDeltas  = $state(null)
   let kpis = $derived(products.length > 0 ? computeKpis(products) : null)
 
+  // ── Search filter ──────────────────────────────────────────────
+  let searchFilter = $state('')
+  let filteredProducts = $derived(
+    searchFilter.trim() === ''
+      ? products
+      : products.filter(p => {
+          const q = searchFilter.trim().toLowerCase()
+          return (
+            (p.name ?? '').toLowerCase().includes(q) ||
+            (p.displayName ?? '').toLowerCase().includes(q) ||
+            (p.type ?? '').toLowerCase().includes(q) ||
+            (p.arch ?? '').toLowerCase().includes(q) ||
+            (p.version ?? '').toLowerCase().includes(q)
+          )
+        })
+  )
+
   // ── Modal ─────────────────────────────────────────────────────
   let selectedProduct = $state(null)
 
@@ -279,6 +296,8 @@
     isLoading={loadPhase !== null}
     productCount={products.length}
     notifCount={unreadCount}
+    {searchFilter}
+    onSearchChange={v => searchFilter = v}
     {onMilestoneChange}
     onAutoRefreshToggle={onAutoRefreshToggle}
     {onIntervalChange}
@@ -318,7 +337,7 @@
     {:else if loadError}
       <div class="error-msg">Error: {loadError}</div>
     {:else}
-      <ProductGrid {products} onSelectProduct={p => selectedProduct = p} />
+      <ProductGrid products={filteredProducts} onSelectProduct={p => selectedProduct = p} />
     {/if}
   </div>
 </div>

@@ -19,6 +19,8 @@
     onManualRefresh     = () => {},
     notifCount    = 0,
     onNotifToggle = () => {},
+    searchFilter     = '',
+    onSearchChange   = () => {},
   } = $props()
 
   let selectedRelease = $derived(releases[selectedIndex])
@@ -67,6 +69,21 @@
       <span class="milestone-meta">
         {productCount} builds · {todayDisplay}
       </span>
+    {/if}
+  </div>
+
+  <!-- Search filter -->
+  <div class="search-box">
+    <span class="search-icon">⌕</span>
+    <input
+      class="search-input"
+      type="text"
+      placeholder="Filter products…"
+      value={searchFilter}
+      oninput={e => onSearchChange(e.target.value)}
+    />
+    {#if searchFilter}
+      <button class="search-clear" onclick={() => onSearchChange('')} title="Clear filter">✕</button>
     {/if}
   </div>
 
@@ -163,6 +180,55 @@
   .milestone-meta {
     color: var(--text-muted);
     font-size: 0.88rem;
+  }
+
+  .search-box {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    background: var(--bg-raised);
+    border: 1px solid var(--border-mid);
+    border-radius: 4px;
+    padding: 0.2rem 0.5rem;
+    flex-shrink: 1;
+    min-width: 0;
+    max-width: 260px;
+  }
+
+  .search-icon {
+    color: var(--text-muted);
+    font-size: 0.95rem;
+    flex-shrink: 0;
+    line-height: 1;
+  }
+
+  .search-input {
+    background: transparent;
+    border: none;
+    outline: none;
+    color: var(--text);
+    font-family: inherit;
+    font-size: 0.88rem;
+    width: 100%;
+    min-width: 0;
+  }
+
+  .search-input::placeholder {
+    color: var(--text-dim);
+  }
+
+  .search-clear {
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    cursor: pointer;
+    font-size: 0.78rem;
+    padding: 0 0.15rem;
+    line-height: 1;
+    flex-shrink: 0;
+  }
+  .search-clear:hover {
+    color: var(--text);
   }
 
   .right {
