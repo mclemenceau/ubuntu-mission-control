@@ -86,7 +86,10 @@
     {/if}
     <img class="flavor-icon" src={flavorIcon} alt="" aria-hidden="true" />
   </div>
-  <span class="chip-arch">{product.arch}</span>
+  <div class="chip-middle">
+    <span>{product.arch}</span>
+    <span>{product.type}</span>
+  </div>
   <div class="chip-bottom">
     <span class="chip-version">{product.version}</span>
     {#if hasTests}
@@ -107,9 +110,8 @@
     display: flex;
     flex-direction: column;
     justify-content: space-between;
-    min-width: 224px;
-    max-width: 336px;
-    height: 74px;
+    min-width: 20em;
+    height: 5.5em;
     padding: 0.5rem 0.875rem 0.5rem 1rem;
     border-radius: 7px;
     border: 1px solid var(--border-subtle);
@@ -186,11 +188,15 @@
     gap: 0.38rem;
   }
 
-  .chip-arch, .chip-version {
+  .chip-middle, .chip-version {
     font-size: 1rem;
     color: var(--text-dim);
     flex-shrink: 0;
     margin-right: 0.18rem;
+  }
+
+  .chip-middle span + span:before {
+    content: " - "
   }
 
   .tc {
