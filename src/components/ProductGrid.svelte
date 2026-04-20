@@ -40,9 +40,9 @@
         const h     = Math.round(140 - t * 110)
         const color = age === 999 ? '#3a3a3a' : `hsl(${h},78%,48%)`
         // Sort stale items newest → oldest, then alphabetically by name
-        if (age === 999) items.sort((a, b) => (a.ageDays ?? 999) - (b.ageDays ?? 999) || (a.name ?? '').localeCompare(b.name ?? ''))
+        if (age === 999) items.sort((a, b) => (a.displayName ?? '').localeCompare(b.displayName ?? ''))
         // Sort non-stale items alphabetically by name
-        else items.sort((a, b) => (a.name ?? '').localeCompare(b.name ?? ''))
+        else items.sort((a, b) => (a.displayName ?? '').localeCompare(b.displayName ?? ''))
         return { label, age, items, color }
       })
   }
