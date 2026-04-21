@@ -154,7 +154,9 @@
           <span class="dl">Bugs</span>
           <span class="dv">
             {#each product.bugs as bug}
-              <span class="bug-tag">LP#{bug}</span>
+              <a href="https://launchpad.net/bugs/{bug}">
+                <span class="bug-tag">LP#{bug}</span>
+              </a>
             {/each}
           </span>
         </div>
