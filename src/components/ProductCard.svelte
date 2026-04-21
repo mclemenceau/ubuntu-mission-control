@@ -37,7 +37,7 @@
     xubuntu:         'https://assets.ubuntu.com/v1/36e8f12b-Xubuntu_logo.svg',
   }
 
-  const UBUNTU_DEFAULT = 'https://assets.ubuntu.com/v1/29985a98-ubuntu-logo32.png'
+  const UBUNTU_DEFAULT = '/images/cof-orange.png'
 
   let flavorIcon = $derived.by(() => {
     const n = ((product.name ?? '') + ' ' + (product.displayName ?? '')).toLowerCase()

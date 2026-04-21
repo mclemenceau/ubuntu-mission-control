@@ -37,7 +37,7 @@
     for (const [key, url] of Object.entries(FLAVOR_ICONS)) {
       if (n.includes(key)) return url
     }
-    return 'https://assets.ubuntu.com/v1/29985a98-ubuntu-logo32.png'
+    return '/images/cof-orange.png'
   })
 
   const STATUS_LABELS = {
