@@ -8,7 +8,6 @@ help:
 	@echo "  make dev      — start Vite dev server with hot reload (port $(DEV_PORT))"
 	@echo "  make test     — run unit tests"
 	@echo "  make build    — build optimised production bundle into dist/"
-	@echo "  make serve    — build + preview production bundle (port $(DEV_PORT))"
 	@echo "  make start    — alias for 'make dev'"
 	@echo "  make clean    — remove dist/"
 
