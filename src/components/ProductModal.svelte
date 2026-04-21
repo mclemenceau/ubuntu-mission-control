@@ -1,5 +1,6 @@
 <script>
   import { onMount } from 'svelte'
+  import cofOrange from '../assets/cof-orange.png'
   import { fetchBuilds } from '../api/client.js'
   import HistoryPanel from './HistoryPanel.svelte'
 
@@ -37,7 +38,7 @@
     for (const [key, url] of Object.entries(FLAVOR_ICONS)) {
       if (n.includes(key)) return url
     }
-    return '/images/cof-orange.png'
+    return cofOrange
   })
 
   const STATUS_LABELS = {

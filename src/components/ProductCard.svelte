@@ -1,4 +1,6 @@
 <script>
+  import cofOrange from '../assets/cof-orange.png'
+
   let { product, onclick } = $props()
 
   let cardClass = $derived(
@@ -37,7 +39,7 @@
     xubuntu:         'https://assets.ubuntu.com/v1/36e8f12b-Xubuntu_logo.svg',
   }
 
-  const UBUNTU_DEFAULT = '/images/cof-orange.png'
+  const UBUNTU_DEFAULT = cofOrange
 
   let flavorIcon = $derived.by(() => {
     const n = ((product.name ?? '') + ' ' + (product.displayName ?? '')).toLowerCase()
