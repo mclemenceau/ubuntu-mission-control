@@ -26,8 +26,8 @@ test:
 build:
 	npm run build
 
-serve: build
-	npm run preview
+serve:
+	npm run build:serve && npm run preview
 
 start: dev
 
