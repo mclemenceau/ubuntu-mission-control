@@ -15,6 +15,7 @@
   import ProductModal from './components/ProductModal.svelte'
   import NotificationPanel from './components/NotificationPanel.svelte'
   import { generateNotifications } from './lib/notifications.js'
+  import CelebrationOverlay from './components/CelebrationOverlay.svelte'
 
   // ── Milestone ──────────────────────────────────────────────────
   let releases      = $state([])
@@ -41,6 +42,27 @@
 
   // ── Modal ─────────────────────────────────────────────────────
   let selectedProduct = $state(null)
+
+  // ── All-approved celebration ───────────────────────────────────
+  let showCelebration = $state(false)
+  let _celebrationTriggered = false
+
+  let allApproved = $derived.by(() => {
+    const nonRejected = products.filter(p => p.status !== 'MARKED_AS_FAILED')
+    return nonRejected.length > 0 && nonRejected.every(p => p.status === 'APPROVED')
+  })
+
+  $effect(() => {
+    if (allApproved) {
+      if (!_celebrationTriggered) {
+        _celebrationTriggered = true
+        showCelebration = true
+        playCelebrationFanfare()
+      }
+    } else {
+      _celebrationTriggered = false
+    }
+  })
 
   // ── Notifications ──────────────────────────────────────────────
   let notifications = $state([])
@@ -187,6 +209,65 @@
     }
   }
 
+  function playCelebrationFanfare() {
+    try {
+      const ctx = new (window.AudioContext || window.webkitAudioContext)()
+
+      function tone(freq, start, duration, vol = 0.22, type = 'sine') {
+        const osc  = ctx.createOscillator()
+        const gain = ctx.createGain()
+        osc.connect(gain)
+        gain.connect(ctx.destination)
+        osc.type = type
+        osc.frequency.value = freq
+        gain.gain.setValueAtTime(0, start)
+        gain.gain.linearRampToValueAtTime(vol, start + 0.02)
+        gain.gain.exponentialRampToValueAtTime(0.001, start + duration)
+        osc.start(start)
+        osc.stop(start + duration + 0.05)
+      }
+
+      const t = ctx.currentTime
+
+      // Ascending arpeggio: C4 E4 G4 C5 E5
+      tone(261.6, t + 0.00, 0.35, 0.20)
+      tone(329.6, t + 0.12, 0.35, 0.20)
+      tone(392.0, t + 0.24, 0.35, 0.20)
+      tone(523.2, t + 0.36, 0.45, 0.22)
+      tone(659.2, t + 0.50, 0.55, 0.22)
+
+      // Triumphant chord stab
+      tone(261.6, t + 0.75, 0.70, 0.18)
+      tone(329.6, t + 0.75, 0.70, 0.18)
+      tone(392.0, t + 0.75, 0.70, 0.18)
+      tone(523.2, t + 0.75, 0.70, 0.20)
+
+      // Second chord hit (higher)
+      tone(392.0, t + 1.20, 0.60, 0.16)
+      tone(493.9, t + 1.20, 0.60, 0.16)
+      tone(587.3, t + 1.20, 0.60, 0.16)
+      tone(783.9, t + 1.20, 0.60, 0.18)
+
+      // Victory high notes flourish
+      tone(1046.5, t + 1.65, 0.30, 0.14)
+      tone(1174.7, t + 1.80, 0.30, 0.14)
+      tone(1318.5, t + 1.95, 0.50, 0.16)
+
+      // Final big chord
+      tone(261.6,  t + 2.20, 1.20, 0.16)
+      tone(329.6,  t + 2.20, 1.20, 0.16)
+      tone(392.0,  t + 2.20, 1.20, 0.16)
+      tone(523.2,  t + 2.20, 1.20, 0.18)
+      tone(1046.5, t + 2.20, 1.20, 0.14)
+
+      // Sparkle overtones (triangle wave for softness)
+      tone(2093.0, t + 2.20, 0.80, 0.08, 'triangle')
+      tone(2637.0, t + 2.40, 0.60, 0.06, 'triangle')
+    } catch {
+      // AudioContext not available — silently skip
+    }
+  }
+
   // ──────────────────────────────────────────────────────────────
   // Refresh timer
   // ──────────────────────────────────────────────────────────────
@@ -310,6 +391,10 @@
     onDismiss={dismissNotification}
     {onNotifClick}
   />
+
+  {#if showCelebration}
+    <CelebrationOverlay onDismiss={() => showCelebration = false} />
+  {/if}
 
   {#if selectedProduct}
     <ProductModal product={selectedProduct} onclose={() => selectedProduct = null} />
