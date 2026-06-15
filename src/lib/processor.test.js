@@ -43,7 +43,7 @@ describe('processor', () => {
     })
   })
 
-  it('enriches items with execution status counts from manual testing plans', async () => {
+  it('enriches items with execution status counts, excluding the Image build plan', async () => {
     const item = {
       id: 1,
       execIds: [],
@@ -58,48 +58,58 @@ describe('processor', () => {
           { id: 13, test_plan: 'Manual Testing', status: 'IN_PROGRESS' },
           { id: 14, test_plan: 'Manual Testing', status: 'NOT_STARTED' },
           { id: 15, test_plan: 'Image build', status: 'PASSED' },
+          { id: 16, test_plan: 'Jenkins image validation', status: 'PASSED' },
         ],
       },
     ])
 
     await enrichWithTestExecutions([item])
 
-    expect(item.execIds).toEqual([11, 12, 13, 14])
-    expect(item.tests).toEqual({ passed: 1, failed: 1, inProgress: 1, notStarted: 1 })
+    expect(item.execIds).toEqual([11, 12, 13, 14, 16])
+    expect(item.tests).toEqual({ passed: 2, failed: 1, inProgress: 1, notStarted: 1 })
+    expect(item._inProgressExecIds).toEqual(new Set([13]))
   })
 
   it('enriches items with bug extraction and result-based test counts', async () => {
     const item = {
       id: 1,
-      execIds: [21],
-      tests: { passed: 0, failed: 0, inProgress: 1, notStarted: 0 },
+      execIds: [16, 21],
+      tests: { passed: 1, failed: 0, inProgress: 1, notStarted: 0 },
       bugs: [],
       _resultPassed: 0,
       _resultFailed: 0,
       _execsWithResults: new Set(),
+      _inProgressExecIds: new Set([21]),
     }
 
-    fetchTestResults.mockResolvedValue([
-      {
-        status: 'PASSED',
-        comment: 'Investigated LP: #123456',
-        issues: [{ issue: { source: 'launchpad', key: '999999' } }],
-      },
-      {
-        status: 'FAILED',
-        comment: 'See bugs.launchpad.net/foo/+bug/234567',
-        issues: [],
-      },
-    ])
+    fetchTestResults.mockImplementation(execId =>
+      Promise.resolve(
+        execId === 16
+          ? [{ status: 'PASSED', comment: '', issues: [] }]
+          : [
+              {
+                status: 'PASSED',
+                comment: 'Investigated LP: #123456',
+                issues: [{ issue: { source: 'launchpad', key: '999999' } }],
+              },
+              {
+                status: 'FAILED',
+                comment: 'See bugs.launchpad.net/foo/+bug/234567',
+                issues: [],
+              },
+            ],
+      ),
+    )
 
     const bugCount = await enrichWithBugs([item])
 
     expect(bugCount).toBe(3)
-    expect(item.tests).toEqual({ passed: 1, failed: 1, inProgress: 0, notStarted: 0 })
+    expect(item.tests).toEqual({ passed: 2, failed: 1, inProgress: 0, notStarted: 0 })
     expect(item.bugs.sort()).toEqual(['123456', '234567', '999999'])
     expect(item).not.toHaveProperty('_resultPassed')
     expect(item).not.toHaveProperty('_resultFailed')
     expect(item).not.toHaveProperty('_execsWithResults')
+    expect(item).not.toHaveProperty('_inProgressExecIds')
   })
 
   it('computes KPIs from current product state', () => {

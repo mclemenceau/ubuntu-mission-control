@@ -25,13 +25,14 @@
   async function loadDayTestData(day, rawBuilds) {
     const execs = rawBuilds
       .flatMap(b => b.test_executions ?? [])
-      .filter(te => te.test_plan === 'Manual Testing')
+      .filter(te => te.test_plan !== 'Image build')
 
     let passed     = execs.filter(e => e.status === 'PASSED').length
     let failed     = execs.filter(e => ['FAILED', 'ENDED_PREMATURELY'].includes(e.status)).length
     let inProgress = execs.filter(e => e.status === 'IN_PROGRESS').length
     let notStarted = execs.filter(e => ['NOT_STARTED', 'NOT_TESTED'].includes(e.status)).length
 
+    const inProgressIds = new Set(execs.filter(e => e.status === 'IN_PROGRESS').map(e => e.id))
     const execResults = new Map()
     let resultPassed = 0, resultFailed = 0
     const execsWithResults = new Set()
@@ -40,7 +41,7 @@
         const results = await fetchTestResults(exec.id).catch(() => [])
         execResults.set(exec.id, results)
         if (results.length > 0) {
-          execsWithResults.add(exec.id)
+          if (inProgressIds.has(exec.id)) execsWithResults.add(exec.id)
           for (const r of results) {
             if (r.status === 'PASSED')      resultPassed++
             else if (r.status === 'FAILED') resultFailed++
@@ -59,7 +60,7 @@
       .map(b => ({
         ...b,
         test_executions: (b.test_executions ?? [])
-          .filter(te => te.test_plan === 'Manual Testing')
+          .filter(te => te.test_plan !== 'Image build')
           .map(exec => ({ ...exec, results: execResults.get(exec.id) ?? [] })),
       }))
       .filter(b => b.test_executions.length > 0)

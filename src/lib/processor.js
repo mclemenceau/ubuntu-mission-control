@@ -44,9 +44,10 @@ export async function enrichWithTestExecutions(items, onProgress) {
       const builds = await fetchBuilds(item.id).catch(() => [])
       const execs = builds
         .flatMap(b => b.test_executions ?? [])
-        .filter(te => te.test_plan === 'Manual Testing')
+        .filter(te => te.test_plan !== 'Image build')
 
       item.execIds = execs.map(e => e.id)
+      item._inProgressExecIds = new Set(execs.filter(e => e.status === 'IN_PROGRESS').map(e => e.id))
       item.tests = {
         passed:     execs.filter(e => e.status === 'PASSED').length,
         failed:     execs.filter(e => ['FAILED', 'ENDED_PREMATURELY'].includes(e.status)).length,
@@ -109,7 +110,7 @@ export async function enrichWithBugs(items, onProgress) {
           }
         }
 
-        if (results.length > 0) item._execsWithResults.add(execId)
+        if (results.length > 0 && item._inProgressExecIds?.has(execId)) item._execsWithResults.add(execId)
       }
 
       item.bugs = [...itemBugs]
@@ -132,6 +133,7 @@ export async function enrichWithBugs(items, onProgress) {
     delete item._resultPassed
     delete item._resultFailed
     delete item._execsWithResults
+    delete item._inProgressExecIds
   }
 
   return globalBugs.size
