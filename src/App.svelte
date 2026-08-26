@@ -14,6 +14,7 @@
   import ProductGrid from './components/ProductGrid.svelte'
   import ProductModal from './components/ProductModal.svelte'
   import NotificationPanel from './components/NotificationPanel.svelte'
+  import BugsPanel from './components/BugsPanel.svelte'
   import { generateNotifications } from './lib/notifications.js'
 
   // ── Milestone ──────────────────────────────────────────────────
@@ -46,6 +47,9 @@
   let notifications = $state([])
   let notifOpen     = $state(false)
   let unreadCount   = $derived(notifications.filter(n => !n.read).length)
+
+  // ── Bugs panel ────────────────────────────────────────────────
+  let bugsOpen = $state(false)
 
   // ── Load state ────────────────────────────────────────────────
   // loadPhase: null = idle, 'initial' = first load (shows overlay),
@@ -266,6 +270,17 @@
   }
 
   // ──────────────────────────────────────────────────────────────
+  // Bugs panel handlers
+  // ──────────────────────────────────────────────────────────────
+  function openBugsPanel() {
+    bugsOpen = true
+  }
+
+  function closeBugsPanel() {
+    bugsOpen = false
+  }
+
+  // ──────────────────────────────────────────────────────────────
   // Lifecycle
   // ──────────────────────────────────────────────────────────────
   onMount(() => {
@@ -311,12 +326,19 @@
     {onNotifClick}
   />
 
+  <BugsPanel
+    open={bugsOpen}
+    {products}
+    onClose={closeBugsPanel}
+    onProductClick={p => { bugsOpen = false; selectedProduct = p }}
+  />
+
   {#if selectedProduct}
     <ProductModal product={selectedProduct} onclose={() => selectedProduct = null} />
   {/if}
 
   {#if kpis}
-    <KpiRow {kpis} deltas={kpiDeltas} />
+    <KpiRow {kpis} deltas={kpiDeltas} onBugsClick={openBugsPanel} />
   {/if}
 
   <div class="grid-wrap">
