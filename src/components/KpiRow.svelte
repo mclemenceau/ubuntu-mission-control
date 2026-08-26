@@ -2,8 +2,8 @@
   import KpiCard from './KpiCard.svelte'
   import { pctColor, fmtDate } from '../lib/utils.js'
 
-  /** @type {{ kpis: import('../lib/processor.js').Kpis, deltas?: object|null }} */
-  let { kpis, deltas = null } = $props()
+  /** @type {{ kpis: import('../lib/processor.js').Kpis, deltas?: object|null, onBugsClick?: (() => void)|null }} */
+  let { kpis, deltas = null, onBugsClick = null } = $props()
 
   const today = fmtDate(new Date())
 </script>
@@ -48,6 +48,7 @@
     pct={kpis.bugs === 0 ? 100 : null}
     color={kpis.bugs === 0 ? 'green' : kpis.bugs <= 3 ? 'amber' : 'red'}
     delta={deltas?.bugs ?? 0}
+    onclick={kpis.bugs > 0 ? onBugsClick : null}
   />
 </div>
 

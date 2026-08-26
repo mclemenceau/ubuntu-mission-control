@@ -1,9 +1,16 @@
 <script>
-  /** @type {{ label: string, value: string|number, sub: string, pct: number|null, color?: string, delta?: number }} */
-  let { label, value, sub, pct, color = 'neutral', delta = 0 } = $props()
+  /**
+   * @type {{
+   *   label: string, value: string|number, sub: string,
+   *   pct: number|null, color?: string, delta?: number,
+   *   onclick?: (() => void)|null
+   * }}
+   */
+  let { label, value, sub, pct, color = 'neutral', delta = 0, onclick = null } = $props()
 </script>
 
-<div class="kpi" class:green={color === 'green'} class:amber={color === 'amber'} class:red={color === 'red'} class:blue={color === 'blue'}>
+<!-- Render as <button> when clickable, plain <div> otherwise -->
+{#snippet inner()}
   <div class="label">{label}</div>
   <div class="value-row">
     <div class="value">{value}</div>
@@ -19,7 +26,26 @@
   <div class="bar">
     <div class="bar-fill" style="width: {pct ?? 0}%"></div>
   </div>
-</div>
+{/snippet}
+
+{#if onclick}
+  <button
+    class="kpi clickable"
+    class:green={color === 'green'}
+    class:amber={color === 'amber'}
+    class:red={color === 'red'}
+    class:blue={color === 'blue'}
+    {onclick}
+  >{@render inner()}</button>
+{:else}
+  <div
+    class="kpi"
+    class:green={color === 'green'}
+    class:amber={color === 'amber'}
+    class:red={color === 'red'}
+    class:blue={color === 'blue'}
+  >{@render inner()}</div>
+{/if}
 
 <style>
   .kpi {
@@ -27,6 +53,25 @@
     border-right: 1px solid var(--border);
     position: relative;
     overflow: hidden;
+    /* Reset button defaults when rendered as <button> */
+    background: inherit;
+    border-top: none;
+    border-bottom: none;
+    border-left: none;
+    font: inherit;
+    color: inherit;
+    text-align: left;
+    width: 100%;
+  }
+
+  .kpi.clickable {
+    cursor: pointer;
+    transition: background 0.15s;
+  }
+  .kpi.clickable:hover { background: var(--surface-hover); }
+  .kpi.clickable:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: -2px;
   }
 
   .label {
