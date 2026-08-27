@@ -223,6 +223,86 @@
   $effect(() => { onArtefactChange?.(selDay?.artefact ?? null) })
 
   // ── Detail panel helpers ────────────────────────────────────────────
+
+  /**
+   * Group all test executions from a set of builds by environment name,
+   * then flatten their results into a single row list per group.
+   *
+   * Each group: { envName, status, rows[], multiplePlans }
+   *   rows: { tester, testName, plan, status, comment }
+   *   multiplePlans: true when >1 distinct test_plan in the group
+   *     (drives whether the "Test Plan" column is shown)
+   *
+   * Group status is the worst status across all executions:
+   *   FAILED > IN_PROGRESS > NOT_STARTED > PASSED
+   */
+  function groupExecsByEnv(builds) {
+    const groups = new Map()
+    for (const build of builds) {
+      for (const exec of build.test_executions) {
+        const key = exec.environment?.name ?? 'Manual Testing'
+        if (!groups.has(key)) groups.set(key, [])
+        groups.get(key).push(exec)
+      }
+    }
+
+    const STATUS_RANK = { FAILED: 0, ENDED_PREMATURELY: 0, IN_PROGRESS: 1,
+                          NOT_STARTED: 2, NOT_TESTED: 2, PASSED: 3 }
+
+    return [...groups.entries()].map(([envName, execs]) => {
+      const plans = new Set(execs.map(e => e.test_plan).filter(Boolean))
+      const multiplePlans = plans.size > 1
+
+      const rows = execs.flatMap(exec => {
+        const effStatus = effectiveExecStatus(exec)
+        const endedPrematurely = exec.status === 'ENDED_PREMATURELY'
+        if (exec.results.length === 0) {
+          return [{
+            tester: null,
+            testName: null,
+            plan: exec.test_plan ?? null,
+            status: effStatus,
+            comment: null,
+            noResults: true,
+          }]
+        }
+        return exec.results.map(r => {
+          const { tester, testName } = parseResultName(r.name)
+          return {
+            tester,
+            testName,
+            plan: exec.test_plan ?? null,
+            // If the execution was cut short, surface that on the row
+            // rather than whatever partial result status was recorded.
+            status: endedPrematurely ? 'ENDED_PREMATURELY' : r.status,
+            comment: r.comment ?? null,
+            noResults: false,
+          }
+        })
+      })
+
+      // Group status derived from result rows where available,
+      // falling back to exec-level status only when no results exist.
+      // This avoids ENDED_PREMATURELY bubbling up when results are present.
+      const resultRows = rows.filter(r => !r.noResults)
+      let groupStatus
+      if (resultRows.length > 0) {
+        const statuses = resultRows.map(r => r.status)
+        if (statuses.some(s => s === 'FAILED'))       groupStatus = 'FAILED'
+        else if (statuses.every(s => s === 'PASSED'))  groupStatus = 'PASSED'
+        else if (statuses.every(s => s === 'SKIPPED')) groupStatus = 'SKIPPED'
+        else                                           groupStatus = 'IN_PROGRESS'
+      } else {
+        groupStatus = execs.reduce((worst, exec) => {
+          const s = effectiveExecStatus(exec)
+          return (STATUS_RANK[s] ?? 99) < (STATUS_RANK[worst] ?? 99) ? s : worst
+        }, 'PASSED')
+      }
+
+      return { envName, status: groupStatus, rows, multiplePlans }
+    })
+  }
+
   function parseResultName(name) {
     if (!name) return { tester: null, testName: '—' }
     const idx = name.indexOf(' - ')
@@ -239,7 +319,7 @@
 
   function resultStatusClass(status) {
     if (status === 'PASSED') return 'res-pass'
-    if (status === 'FAILED') return 'res-fail'
+    if (['FAILED', 'ENDED_PREMATURELY'].includes(status)) return 'res-fail'
     return 'res-other'
   }
 
@@ -380,51 +460,51 @@
         {/if}
       </div>
 
-      <!-- Executions + results -->
+      <!-- Executions + results, grouped by environment -->
       {#if !selDay.builds || selDay.builds.length === 0}
         <div class="detail-empty">No test executions for this build.</div>
       {:else}
-        {#each selDay.builds as build}
-          {#each build.test_executions as exec}
-            {@const effStatus = effectiveExecStatus(exec)}
-            <div class="det-exec">
-              <div class="det-exec-hdr">
-                <div class="det-exec-left">
-                  <span class="det-plan">{exec.test_plan ?? 'Test execution'}</span>
-                  {#if exec.environment?.name}
-                    <span class="det-env">{exec.environment.name}</span>
-                  {/if}
-                </div>
-                <span class="exec-badge {execStatusClass(effStatus)}">{effStatus ?? '—'}</span>
-              </div>
+        {#each groupExecsByEnv(selDay.builds) as group}
+          <div class="det-env-group">
+            <div class="det-env-hdr">
+              <span>{group.envName}</span>
+              <span class="exec-badge {execStatusClass(group.status)}">{group.status ?? '—'}</span>
+            </div>
 
-              {#if exec.results.length === 0}
-                <div class="det-no-results">No results submitted yet.</div>
-              {:else}
-                <table class="det-table">
-                  <thead>
-                    <tr>
-                      <th>Tester</th>
-                      <th>Test</th>
-                      <th>Status</th>
-                      <th>Comment</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {#each exec.results as r}
-                      {@const { tester, testName } = parseResultName(r.name)}
+            {#if group.rows.every(r => r.noResults)}
+              <div class="det-no-results">No results submitted yet.</div>
+            {:else}
+              <table class="det-table">
+                <thead>
+                  <tr>
+                    {#if group.multiplePlans}<th>Test Plan</th>{/if}
+                    <th>Tester</th>
+                    <th>Test</th>
+                    <th>Status</th>
+                    <th>Comment</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {#each group.rows as r}
+                    {#if r.noResults}
+                      <tr class="res-other">
+                        {#if group.multiplePlans}<td class="det-plan-col">{r.plan ?? '—'}</td>{/if}
+                        <td colspan="4" class="det-no-results-inline">No results submitted yet.</td>
+                      </tr>
+                    {:else}
                       <tr class={resultStatusClass(r.status)}>
-                        <td class="det-tester">{tester ?? '—'}</td>
-                        <td class="det-name">{testName}</td>
+                        {#if group.multiplePlans}<td class="det-plan-col">{r.plan ?? '—'}</td>{/if}
+                        <td class="det-tester">{r.tester ?? '—'}</td>
+                        <td class="det-name">{r.testName}</td>
                         <td><span class="res-badge {resultStatusClass(r.status)}">{r.status ?? '—'}</span></td>
                         <td class="det-comment">{r.comment ?? ''}</td>
                       </tr>
-                    {/each}
-                  </tbody>
-                </table>
-              {/if}
-            </div>
-          {/each}
+                    {/if}
+                  {/each}
+                </tbody>
+              </table>
+            {/if}
+          </div>
         {/each}
       {/if}
     </div>
@@ -723,38 +803,25 @@
   }
 
   /* ── Execution blocks ─────────────────────────────────────────── */
-  .det-exec {
-    border-top: 1px solid rgba(255,255,255,0.04);
-  }
-  .det-exec:first-child { border-top: none; }
 
-  .det-exec-hdr {
+  /* Environment group - top-level section */
+  .det-env-group {
+    border-top: 1px solid rgba(255,255,255,0.07);
+  }
+  .det-env-group:first-child { border-top: none; }
+
+  .det-env-hdr {
     display: flex;
     align-items: center;
     justify-content: space-between;
     gap: 0.7rem;
-    padding: 0.55rem 1.1rem;
+    padding: 0.45rem 1.1rem;
+    font-size: 0.82rem;
+    font-weight: 700;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    color: var(--text-dim);
     background: var(--surface-shade);
-  }
-
-  .det-exec-left {
-    display: flex;
-    align-items: center;
-    gap: 0.55rem;
-    flex: 1;
-    min-width: 0;
-  }
-
-  .det-plan {
-    font-size: 1rem;
-    font-weight: 600;
-    color: var(--text-soft);
-  }
-
-  .det-env {
-    font-size: 0.9rem;
-    color: var(--text-muted);
-    font-style: italic;
   }
 
   .det-no-results {
@@ -762,6 +829,11 @@
     color: var(--text-dim);
     font-style: italic;
     padding: 0.55rem 1.1rem;
+  }
+
+  .det-no-results-inline {
+    color: var(--text-dim);
+    font-style: italic;
   }
 
   /* ── Results table ────────────────────────────────────────────── */
@@ -790,6 +862,7 @@
   }
   .det-table tr:last-child td { border-bottom: none; }
 
+  .det-plan-col { color: var(--text-muted); font-size: 0.95rem; white-space: nowrap; }
   .res-pass td { background: rgba(0,60,0,0.15); }
   .res-fail td { background: rgba(60,0,0,0.15); }
 
