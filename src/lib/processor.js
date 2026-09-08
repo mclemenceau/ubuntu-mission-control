@@ -130,6 +130,9 @@ export async function enrichWithBugs(items, onProgress) {
         item.tests.inProgress - item._execsWithResults.size,
       )
     }
+    // IN_PROGRESS executions with no results are not actionable -
+    // suppress them; only PASSED/FAILED matter.
+    item.tests.inProgress = 0
     delete item._resultPassed
     delete item._resultFailed
     delete item._execsWithResults

@@ -54,6 +54,8 @@
       failed     = resultFailed
       inProgress = Math.max(0, inProgress - execsWithResults.size)
     }
+    // Suppress IN_PROGRESS with no results - not actionable signal.
+    inProgress = 0
 
     day.tests = { passed, failed, inProgress, notStarted }
     day.builds = rawBuilds

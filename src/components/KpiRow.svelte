@@ -28,7 +28,7 @@
   <KpiCard
     label="Test Executions"
     value={kpis.tests.total}
-    sub="{kpis.tests.passed} pass · {kpis.tests.failed} fail · {kpis.tests.inProgress} in progress"
+    sub="{kpis.tests.passed} pass · {kpis.tests.failed} fail"
     pct={kpis.tests.total > 0 ? Math.round(kpis.tests.passed / kpis.tests.total * 100) : null}
     color="blue"
     delta={deltas?.tests ?? 0}
