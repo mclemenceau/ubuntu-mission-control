@@ -111,10 +111,6 @@
         loadPct = 30 + Math.round((done / total) * 25)
       })
 
-      if (!background) {
-        products = [...items]
-      }
-
       // Phase 3 — bug extraction
       loadLabel = 'Analysing test results…'
       loadPct   = 55
