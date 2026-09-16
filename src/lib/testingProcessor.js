@@ -204,7 +204,13 @@ export function groupByArtifact(entries) {
       bugs: r.bugs.size,
       passRate: r.total > 0 ? Math.round((r.passed / r.total) * 100) : null,
     }))
-    .sort((a, b) => (b.failed - a.failed) || (b.total - a.total))
+    .sort((a, b) => {
+      // Nulls (no results) go to the bottom
+      if (a.passRate === null && b.passRate === null) return 0
+      if (a.passRate === null) return 1
+      if (b.passRate === null) return -1
+      return a.passRate - b.passRate
+    })
 }
 
 /** Per-tester aggregation, sorted by total tests descending. */

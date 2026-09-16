@@ -330,7 +330,13 @@ export async function buildCurrentTestSnapshot(products) {
         ? Math.round((a.passed / (a.passed + a.failed)) * 100)
         : null,
     }))
-    .sort((a, b) => (b.failed - a.failed) || (b.passed + b.failed) - (a.passed + a.failed))
+    .sort((a, b) => {
+      // Nulls (no results) go to the bottom
+      if (a.passRate === null && b.passRate === null) return 0
+      if (a.passRate === null) return 1
+      if (b.passRate === null) return -1
+      return a.passRate - b.passRate
+    })
 
   // Finalize tester rows
   const byTester = [...testerMap.values()]
