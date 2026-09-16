@@ -12,9 +12,20 @@
   let { open = false, products = [], onClose = () => {} } = $props()
 
   // ── State ─────────────────────────────────────────────────────
-  let loading  = $state(false)
-  let error    = $state(null)
-  let snapshot = $state(null)   // { summary, byArtifact, byTester, failures }
+  let loading    = $state(false)
+  let error      = $state(null)
+  let snapshot   = $state(null)   // { summary, byArtifact, byTester, failures }
+  let testerMode = $state('all')  // 'all' | 'manual' | 'automated'
+
+  // Filter tester rows client-side based on mode
+  let byTesterFiltered = $derived.by(() => {
+    if (!snapshot) return []
+    if (testerMode === 'manual')
+      return snapshot.byTester.filter(r => r.manualTotal > 0)
+    if (testerMode === 'automated')
+      return snapshot.byTester.filter(r => r.automatedTotal > 0)
+    return snapshot.byTester
+  })
 
   // ── Load on open ──────────────────────────────────────────────
   $effect(() => {
@@ -148,12 +159,20 @@
 
             <!-- By Tester -->
             <div class="panel">
-              <div class="panel-title">By Tester</div>
+              <div class="panel-title-row">
+                <span class="panel-title">By Tester</span>
+                <div class="mode-pills">
+                  <button class="mode-pill" class:active={testerMode === 'all'}       onclick={() => testerMode = 'all'}>All</button>
+                  <button class="mode-pill" class:active={testerMode === 'manual'}    onclick={() => testerMode = 'manual'}>Manual</button>
+                  <button class="mode-pill" class:active={testerMode === 'automated'} onclick={() => testerMode = 'automated'}>Automated</button>
+                </div>
+              </div>
               <div class="table-wrap">
                 <table>
                   <thead>
                     <tr>
                       <th>Tester</th>
+                      <th class="num">Total</th>
                       <th class="num">Pass</th>
                       <th class="num">Fail</th>
                       <th class="num">Rate</th>
@@ -161,9 +180,10 @@
                     </tr>
                   </thead>
                   <tbody>
-                    {#each snapshot.byTester as row (row.tester)}
+                    {#each byTesterFiltered as row (row.tester)}
                       <tr>
                         <td class="tester-name">{row.tester || '(unknown)'}</td>
+                        <td class="num">{row.total}</td>
                         <td class="num green-text">{row.passed}</td>
                         <td class="num {row.failed > 0 ? 'red-text' : 'dim-text'}">{row.failed}</td>
                         <td class="num">
@@ -403,6 +423,43 @@
     display: flex;
     align-items: center;
     gap: 0.5rem;
+  }
+
+  .panel-title-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 0.65rem;
+  }
+  .panel-title-row .panel-title {
+    margin-bottom: 0;
+  }
+
+  .mode-pills {
+    display: flex;
+    gap: 0.2rem;
+  }
+
+  .mode-pill {
+    background: var(--bg-panel);
+    border: 1px solid var(--border-mid);
+    color: var(--text-muted);
+    font-family: inherit;
+    font-size: 0.68rem;
+    font-weight: 600;
+    padding: 0.1rem 0.4rem;
+    border-radius: 10px;
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s, border-color 0.15s;
+  }
+  .mode-pill:hover {
+    color: var(--text);
+    border-color: var(--border-strong);
+  }
+  .mode-pill.active {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #fff;
   }
 
   /* ── Failures section ────────────────────────────────────── */

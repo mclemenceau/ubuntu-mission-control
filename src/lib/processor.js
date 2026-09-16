@@ -47,6 +47,7 @@ export async function enrichWithTestExecutions(items, onProgress) {
         .filter(te => te.test_plan !== 'Image build')
 
       item.execIds = execs.map(e => e.id)
+      item.execPlans = new Map(execs.map(e => [e.id, e.test_plan]))
       item._inProgressExecIds = new Set(execs.filter(e => e.status === 'IN_PROGRESS').map(e => e.id))
       item.tests = {
         passed:     execs.filter(e => e.status === 'PASSED').length,
@@ -250,7 +251,8 @@ export async function buildCurrentTestSnapshot(products) {
     for (const execId of p.execIds ?? []) {
       if (!seen.has(execId)) {
         seen.add(execId)
-        queue.push({ product: p, execId })
+        const testPlan = p.execPlans?.get(execId) ?? ''
+        queue.push({ product: p, execId, testPlan })
       }
     }
   }
@@ -259,9 +261,10 @@ export async function buildCurrentTestSnapshot(products) {
   const testerMap  = new Map()   // key: testerName
   const failures   = []
 
-  await Promise.all(queue.map(async ({ product, execId }) => {
+  await Promise.all(queue.map(async ({ product, execId, testPlan }) => {
     const results = await fetchTestResults(execId).catch(() => [])
     const artKey  = `${product.displayName}|${product.arch}`
+    const manual  = testPlan === 'Manual Testing'
 
     if (!artMap.has(artKey)) {
       artMap.set(artKey, {
@@ -284,7 +287,9 @@ export async function buildCurrentTestSnapshot(products) {
           tester,
           passed: 0,
           failed: 0,
-          bugs:   new Set(),
+          manualTotal: 0,
+          automatedTotal: 0,
+          bugs: new Set(),
         })
       }
       const t = testerMap.get(tester)
@@ -303,6 +308,8 @@ export async function buildCurrentTestSnapshot(products) {
           comment: r.comment ?? '',
         })
       }
+      if (manual) t.manualTotal++
+      else t.automatedTotal++
 
       // Collect bugs from structured issues and freeform comments
       const rawBugs = new Set()
@@ -349,7 +356,6 @@ export async function buildCurrentTestSnapshot(products) {
         : null,
     }))
     .sort((a, b) => b.total - a.total)
-
   const totalPassed = byArtifact.reduce((s, a) => s + a.passed, 0)
   const totalFailed = byArtifact.reduce((s, a) => s + a.failed, 0)
   const summary = {
