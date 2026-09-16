@@ -3,7 +3,6 @@
   import { fmtDate } from '../lib/utils.js'
   import { clearCache } from '../api/client.js'
   import BugPanel from './BugPanel.svelte'
-  import TestHistoryDialog from './TestHistoryDialog.svelte'
   import {
     buildTestingDataset,
     computeTestingKpis,
@@ -21,9 +20,6 @@
   let timeframeDays = $state(7)
   let filterOS      = $state('')
   let filterTester  = $state('')
-
-  // ── History dialog ────────────────────────────────────────────────
-  let historyOpen = $state(false)
 
   // ── Data state ───────────────────────────────────────────────────
   let rawEntries = $state([])
@@ -146,12 +142,6 @@
 
 <BugPanel open={bugPanelOpen} bugs={bugList} onClose={() => bugPanelOpen = false} />
 
-<TestHistoryDialog
-  open={historyOpen}
-  release={selectedRelease?.release ?? ''}
-  onClose={() => historyOpen = false}
-/>
-
 <div class="testing-page">
 
   <!-- ── Filter bar ────────────────────────────────────────── -->
@@ -201,11 +191,6 @@
     {#if !isLoading && rawEntries.length > 0}
       <button class="refresh-btn" onclick={() => loadData(true)} title="Refresh data">↺ Refresh</button>
     {/if}
-    <button
-      class="history-btn"
-      onclick={() => historyOpen = true}
-      title="View test history (30/60/90 days)"
-    >⏱ History</button>
   </div>
 
   <!-- ── Loading state ─────────────────────────────────────── -->
@@ -500,23 +485,6 @@
   .refresh-btn:hover {
     color: var(--text);
     border-color: var(--accent);
-  }
-
-  .history-btn {
-    background: none;
-    border: 1px solid var(--accent);
-    color: var(--accent);
-    font-size: 0.82rem;
-    font-family: inherit;
-    padding: 0.2rem 0.65rem;
-    border-radius: 4px;
-    cursor: pointer;
-    font-weight: 600;
-    transition: background 0.15s, color 0.15s;
-  }
-  .history-btn:hover {
-    background: var(--accent);
-    color: #fff;
   }
 
   /* ── Loading ─────────────────────────────────────────────── */
