@@ -93,7 +93,7 @@ export async function buildTestingDataset({ release, dateFrom, dateTo }, onProgr
       const date = versionToDate(version.version)
       for (const build of builds) {
         for (const exec of (build.test_executions ?? [])) {
-          if (exec.test_plan === 'Manual Testing') {
+          if (exec.test_plan !== 'Image build') {
             execQueue.push({
               art, version, date,
               arch: build.architecture || '',
@@ -169,14 +169,14 @@ export function groupByDate(entries, dateFrom, dateTo) {
   const end = new Date(dateTo + 'T00:00:00')
   while (d <= end) {
     const ds = dayISO(d)
-    map.set(ds, { date: ds, passed: 0, failed: 0 })
+    map.set(ds, { date: ds, passed: 0, failed: 0, total: 0 })
     d = new Date(d.getTime() + 86_400_000)
   }
   for (const e of entries) {
     if (!e.date || !map.has(e.date)) continue
     const day = map.get(e.date)
-    if (e.status === 'PASSED') day.passed++
-    else if (e.status === 'FAILED') day.failed++
+    if (e.status === 'PASSED') { day.passed++; day.total++ }
+    else if (e.status === 'FAILED') { day.failed++; day.total++ }
   }
   return [...map.values()]
 }

@@ -197,7 +197,7 @@
                 {@const barH = chartMax > 0 ? Math.round((total / chartMax) * 100) : 0}
                 <div
                   class="chart-col"
-                  title="{shortDate(day.date)}: {day.passed} passed, {day.failed} failed"
+                  title="{shortDate(day.date)}: {day.passed + day.failed} tests ({day.passed} passed, {day.failed} failed)"
                 >
                   <div class="chart-bar-area">
                     {#if total > 0}
