@@ -99,6 +99,7 @@ export async function buildTestingDataset({ release, dateFrom, dateTo }, onProgr
               arch: build.architecture || '',
               execId: exec.id,
               execStatus: exec.status,
+              testPlan: exec.test_plan,
             })
           }
         }
@@ -110,9 +111,10 @@ export async function buildTestingDataset({ release, dateFrom, dateTo }, onProgr
   // Phase 4 — fetch individual test results for each execution
   done = 0
   const entries = []
-  await Promise.all(execQueue.map(async ({ art, version, date, arch, execId, execStatus }) => {
+  await Promise.all(execQueue.map(async ({ art, version, date, arch, execId, execStatus, testPlan }) => {
     try {
       const results = await fetchTestResults(execId)
+      const manual = testPlan === 'Manual Testing'
       for (const r of results) {
         entries.push({
           date,
@@ -126,6 +128,8 @@ export async function buildTestingDataset({ release, dateFrom, dateTo }, onProgr
           type:         artifactTypeLabel(art.name, art.release),
           execId,
           execStatus,
+          testPlan,
+          manual,
           resultId:  r.id,
           status:    r.status,   // PASSED | FAILED | SKIPPED
           tester:    parseTester(r.name),
@@ -213,24 +217,40 @@ export function groupByArtifact(entries) {
     })
 }
 
-/** Per-tester aggregation, sorted by total tests descending. */
-export function groupByTester(entries) {
+/**
+ * Per-tester aggregation, sorted by total tests descending.
+ * mode: 'all' | 'manual' | 'automated'
+ */
+export function groupByTester(entries, mode = 'all') {
+  const filtered = mode === 'manual'
+    ? entries.filter(e => e.manual)
+    : mode === 'automated'
+      ? entries.filter(e => !e.manual)
+      : entries
+
   const map = new Map()
-  for (const e of entries) {
+  for (const e of filtered) {
     const tester = e.tester || '(unknown)'
     if (!map.has(tester)) {
-      map.set(tester, { tester, passed: 0, failed: 0, total: 0, bugs: new Set() })
+      map.set(tester, {
+        tester,
+        passed: 0, failed: 0, total: 0,
+        manualTotal: 0, automatedTotal: 0,
+        bugs: new Set(),
+      })
     }
     const row = map.get(tester)
     if (e.status === 'PASSED') row.passed++
     else if (e.status === 'FAILED') row.failed++
     row.total++
+    if (e.manual) row.manualTotal++
+    else row.automatedTotal++
     e.bugs.forEach(b => row.bugs.add(b))
   }
   return [...map.values()]
     .map(r => ({
       ...r,
-      bugs: r.bugs.size,
+      bugs:     r.bugs.size,
       passRate: r.total > 0 ? Math.round((r.passed / r.total) * 100) : null,
     }))
     .sort((a, b) => b.total - a.total)

@@ -47,7 +47,10 @@
   let kpis       = $derived(computeTestingKpis(entries))
   let byDate     = $derived(groupByDate(entries, dateFrom, dateTo))
   let byArtifact = $derived(groupByArtifact(entries))
-  let byTester   = $derived(groupByTester(entries))
+
+  // ── Tester table mode ─────────────────────────────────────────────
+  let testerMode = $state('all')   // 'all' | 'manual' | 'automated'
+  let byTester   = $derived(groupByTester(entries, testerMode))
 
   // Max daily total for chart scaling
   let chartMax = $derived(Math.max(1, ...byDate.map(d => d.passed + d.failed)))
@@ -341,12 +344,20 @@
 
       <!-- Tester breakdown -->
       <div class="breakdown-panel">
-        <div class="section-title">By Tester</div>
+        <div class="section-title-row">
+          <span class="section-title">By Tester</span>
+          <div class="mode-pills">
+            <button class="mode-pill" class:active={testerMode === 'all'}        onclick={() => testerMode = 'all'}>All</button>
+            <button class="mode-pill" class:active={testerMode === 'manual'}     onclick={() => testerMode = 'manual'}>Manual</button>
+            <button class="mode-pill" class:active={testerMode === 'automated'}  onclick={() => testerMode = 'automated'}>Automated</button>
+          </div>
+        </div>
         <div class="table-wrap">
           <table>
             <thead>
               <tr>
                 <th>Tester</th>
+                <th class="num-col">Total</th>
                 <th class="num-col">Pass</th>
                 <th class="num-col">Fail</th>
                 <th class="num-col">Rate</th>
@@ -357,6 +368,7 @@
               {#each byTester as row}
                 <tr>
                   <td class="tester-name">{row.tester}</td>
+                  <td class="num-col">{row.total}</td>
                   <td class="num-col green-text">{row.passed}</td>
                   <td class="num-col {row.failed > 0 ? 'red-text' : 'dim-text'}">{row.failed}</td>
                   <td class="num-col">
@@ -667,6 +679,43 @@
     letter-spacing: 0.1em;
     color: var(--text-dim);
     margin-bottom: 0.85rem;
+  }
+
+  .section-title-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 0.65rem;
+  }
+  .section-title-row .section-title {
+    margin-bottom: 0;
+  }
+
+  .mode-pills {
+    display: flex;
+    gap: 0.2rem;
+  }
+
+  .mode-pill {
+    background: var(--bg-raised);
+    border: 1px solid var(--border-mid);
+    color: var(--text-muted);
+    font-family: inherit;
+    font-size: 0.72rem;
+    font-weight: 600;
+    padding: 0.1rem 0.45rem;
+    border-radius: 10px;
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s, border-color 0.15s;
+  }
+  .mode-pill:hover {
+    color: var(--text);
+    border-color: var(--border-strong);
+  }
+  .mode-pill.active {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #fff;
   }
 
   /* ── Trend chart ─────────────────────────────────────────── */
