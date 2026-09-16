@@ -46,7 +46,7 @@ export function fmtDate(d) {
  * e.g. "resolute-live-server-amd64.iso" → "amd64"
  */
 export function extractArch(name) {
-  const m = (name || '').match(/[-_](amd64|arm64(?:\+[\w]+)?|armhf|ppc64el|riscv64|s390x)(?:[-+.]|$)/)
+  const m = (name || '').match(/[-_](amd64(?:v\d+)?|arm64(?:\+[\w]+)?|armhf|ppc64el|riscv64|s390x)(?:[-+.]|$)/)
   return m ? m[1] : ''
 }
 
@@ -59,7 +59,7 @@ export function artifactTypeLabel(name, release) {
   if (release && n.startsWith(release + '-')) n = n.slice(release.length + 1)
   // Strip trailing arch + extension(s)
   n = n.replace(
-    /[-_]?(amd64|arm64(\+[\w]+)?|armhf|ppc64el|riscv64|s390x)([-+].+)?(\.\w+)+$/,
+    /[-_]?(amd64(?:v\d+)?|arm64(\+[\w]+)?|armhf|ppc64el|riscv64|s390x)([-+].+)?(\.\w+)+$/,
     '',
   )
   return n || name

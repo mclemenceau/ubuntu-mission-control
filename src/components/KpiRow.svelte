@@ -2,8 +2,8 @@
   import KpiCard from './KpiCard.svelte'
   import { pctColor, fmtDate } from '../lib/utils.js'
 
-  /** @type {{ kpis: import('../lib/processor.js').Kpis, deltas?: object|null, onBugsClick?: (() => void)|null }} */
-  let { kpis, deltas = null, onBugsClick = null } = $props()
+  /** @type {{ kpis: import('../lib/processor.js').Kpis, deltas?: object|null, onBugsClick?: (() => void)|null, onTestsClick?: (() => void)|null }} */
+  let { kpis, deltas = null, onBugsClick = null, onTestsClick = null } = $props()
 
   const today = fmtDate(new Date())
 </script>
@@ -32,6 +32,7 @@
     pct={kpis.tests.total > 0 ? Math.round(kpis.tests.passed / kpis.tests.total * 100) : null}
     color="blue"
     delta={deltas?.tests ?? 0}
+    onclick={kpis.tests.total > 0 ? onTestsClick : null}
   />
   <KpiCard
     label="Pass Rate"
