@@ -15,11 +15,18 @@
   import ProductModal from './components/ProductModal.svelte'
   import NotificationPanel from './components/NotificationPanel.svelte'
   import BugsPanel from './components/BugsPanel.svelte'
+  import TestSnapshotPanel from './components/TestSnapshotPanel.svelte'
+  import TestingPage from './components/TestingPage.svelte'
   import { generateNotifications } from './lib/notifications.js'
 
   // ── Milestone ──────────────────────────────────────────────────
   let releases      = $state([])
   let selectedIndex = $state(0)
+
+  let selectedRelease = $derived(releases[selectedIndex])
+
+  // ── Page navigation ───────────────────────────────────────────
+  let activePage = $state('artifacts')  // 'artifacts' | 'testing'
 
   // ── Data ──────────────────────────────────────────────────────
   let products   = $state([])
@@ -50,6 +57,9 @@
 
   // ── Bugs panel ────────────────────────────────────────────────
   let bugsOpen = $state(false)
+
+  // ── Test snapshot panel ───────────────────────────────────────
+  let testSnapshotOpen = $state(false)
 
   // ── Load state ────────────────────────────────────────────────
   // loadPhase: null = idle, 'initial' = first load (shows overlay),
@@ -277,6 +287,17 @@
   }
 
   // ──────────────────────────────────────────────────────────────
+  // Test snapshot panel handlers
+  // ──────────────────────────────────────────────────────────────
+  function openTestSnapshot() {
+    testSnapshotOpen = true
+  }
+
+  function closeTestSnapshot() {
+    testSnapshotOpen = false
+  }
+
+  // ──────────────────────────────────────────────────────────────
   // Lifecycle
   // ──────────────────────────────────────────────────────────────
   onMount(() => {
@@ -329,32 +350,58 @@
     onProductClick={p => { bugsOpen = false; selectedProduct = p }}
   />
 
+  <TestSnapshotPanel
+    open={testSnapshotOpen}
+    {products}
+    onClose={closeTestSnapshot}
+  />
+
   {#if selectedProduct}
     <ProductModal product={selectedProduct} onclose={() => selectedProduct = null} />
   {/if}
 
-  {#if kpis}
-    <KpiRow {kpis} deltas={kpiDeltas} onBugsClick={openBugsPanel} />
+  {#if kpis && activePage === 'artifacts'}
+    <KpiRow {kpis} deltas={kpiDeltas} onBugsClick={openBugsPanel} onTestsClick={openTestSnapshot} />
   {/if}
 
-  <div class="grid-wrap">
-    {#if loadPhase === 'initial'}
-      <!-- Initial load overlay — not shown during background refresh -->
-      <div class="loading-screen">
-        <div class="loading-box">
-          <div class="loading-title">Loading Data</div>
-          <div class="loading-label">{loadLabel}</div>
-          <div class="loading-track">
-            <div class="loading-fill" style="width: {loadPct}%"></div>
+  <!-- Page navigation tabs -->
+  <nav class="page-nav">
+    <button
+      class="nav-tab"
+      class:active={activePage === 'artifacts'}
+      onclick={() => activePage = 'artifacts'}
+    >⬡ Artifacts</button>
+    <button
+      class="nav-tab"
+      class:active={activePage === 'testing'}
+      onclick={() => activePage = 'testing'}
+    >✓ Testing</button>
+  </nav>
+
+  {#if activePage === 'artifacts'}
+    <div class="grid-wrap">
+      {#if loadPhase === 'initial'}
+        <!-- Initial load overlay — not shown during background refresh -->
+        <div class="loading-screen">
+          <div class="loading-box">
+            <div class="loading-title">Loading Data</div>
+            <div class="loading-label">{loadLabel}</div>
+            <div class="loading-track">
+              <div class="loading-fill" style="width: {loadPct}%"></div>
+            </div>
           </div>
         </div>
-      </div>
-    {:else if loadError}
-      <div class="error-msg">Error: {loadError}</div>
-    {:else}
-      <ProductGrid products={filteredProducts} onSelectProduct={p => selectedProduct = p} />
-    {/if}
-  </div>
+      {:else if loadError}
+        <div class="error-msg">Error: {loadError}</div>
+      {:else}
+        <ProductGrid products={filteredProducts} onSelectProduct={p => selectedProduct = p} />
+      {/if}
+    </div>
+  {:else}
+    <div class="testing-wrap">
+      <TestingPage {releases} {selectedRelease} />
+    </div>
+  {/if}
 </div>
 
 <style>
@@ -371,6 +418,43 @@
     overflow-y: auto;
     overflow-x: hidden;
     padding: 0.75rem 1rem;
+  }
+
+  .testing-wrap {
+    flex: 1;
+    overflow-y: auto;
+    overflow-x: hidden;
+  }
+
+  /* ── Page navigation tabs ────────────────────────────────── */
+  .page-nav {
+    display: flex;
+    gap: 0;
+    background: var(--bg-panel);
+    border-bottom: 1px solid var(--border-mid);
+    padding: 0 1rem;
+    flex-shrink: 0;
+  }
+
+  .nav-tab {
+    background: none;
+    border: none;
+    border-bottom: 2px solid transparent;
+    color: var(--text-dim);
+    font-family: inherit;
+    font-size: 0.82rem;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    padding: 0.55rem 1rem;
+    cursor: pointer;
+    margin-bottom: -1px;
+    transition: color 0.15s, border-color 0.15s;
+  }
+  .nav-tab:hover { color: var(--text); }
+  .nav-tab.active {
+    color: var(--accent);
+    border-bottom-color: var(--accent);
   }
 
   /* Initial load screen */

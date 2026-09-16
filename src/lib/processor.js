@@ -217,3 +217,143 @@ export function diffProducts(current, next) {
   if (merged.length !== current.length) changed = true
   return { products: merged, changed }
 }
+
+// ── Test snapshot helpers ─────────────────────────────────────────────────
+
+function parseTester(name) {
+  const idx = (name || '').indexOf(' - ')
+  return idx > 0 ? name.slice(0, idx).trim() : (name || '').trim()
+}
+
+function parseTestCase(name) {
+  const idx = (name || '').indexOf(' - ')
+  return idx > 0 ? name.slice(idx + 3).trim() : (name || '').trim()
+}
+
+/**
+ * Re-reads cached test results for all current products and aggregates them
+ * into a snapshot matching exactly what the Test Executions KPI shows.
+ *
+ * Returns:
+ *   summary    - { total, passed, failed, inProgress, passRate }
+ *   byArtifact - [{ displayName, arch, passed, failed, inProgress, bugs,
+ *                   passRate }] sorted by failures desc
+ *   byTester   - [{ tester, passed, failed, bugs, passRate }] sorted by
+ *                total desc
+ *   failures   - [{ displayName, arch, testCase, tester, comment }]
+ */
+export async function buildCurrentTestSnapshot(products) {
+  // Deduplicate execIds across products
+  const seen = new Set()
+  const queue = []
+  for (const p of products) {
+    for (const execId of p.execIds ?? []) {
+      if (!seen.has(execId)) {
+        seen.add(execId)
+        queue.push({ product: p, execId })
+      }
+    }
+  }
+
+  const artMap     = new Map()   // key: `${displayName}|${arch}`
+  const testerMap  = new Map()   // key: testerName
+  const failures   = []
+
+  await Promise.all(queue.map(async ({ product, execId }) => {
+    const results = await fetchTestResults(execId).catch(() => [])
+    const artKey  = `${product.displayName}|${product.arch}`
+
+    if (!artMap.has(artKey)) {
+      artMap.set(artKey, {
+        displayName: product.displayName,
+        arch:        product.arch,
+        passed:      0,
+        failed:      0,
+        inProgress:  0,
+        bugs:        new Set(),
+      })
+    }
+    const art = artMap.get(artKey)
+
+    for (const r of results) {
+      const tester   = parseTester(r.name)
+      const testCase = parseTestCase(r.name)
+
+      if (!testerMap.has(tester)) {
+        testerMap.set(tester, {
+          tester,
+          passed: 0,
+          failed: 0,
+          bugs:   new Set(),
+        })
+      }
+      const t = testerMap.get(tester)
+
+      if (r.status === 'PASSED') {
+        art.passed++
+        t.passed++
+      } else if (r.status === 'FAILED') {
+        art.failed++
+        t.failed++
+        failures.push({
+          displayName: product.displayName,
+          arch:        product.arch,
+          testCase,
+          tester,
+          comment: r.comment ?? '',
+        })
+      }
+
+      // Collect bugs from structured issues and freeform comments
+      const rawBugs = new Set()
+      for (const { issue } of r.issues ?? []) {
+        if (issue?.source === 'launchpad' && issue?.key) rawBugs.add(issue.key)
+      }
+      const comment = r.comment ?? ''
+      for (const pat of [
+        /bugs\.launchpad\.net\/[^\s)]+\/\+bug\/(\d+)/gi,
+        /\bbug\s*#?(\d{5,7})\b/gi,
+        /\bLP[:\s]+#?(\d{5,7})\b/gi,
+      ]) {
+        for (const m of comment.matchAll(pat)) rawBugs.add(m[1])
+      }
+      rawBugs.forEach(b => { art.bugs.add(b); t.bugs.add(b) })
+    }
+  }))
+
+  // Finalize artifact rows
+  const byArtifact = [...artMap.values()]
+    .map(a => ({
+      ...a,
+      bugs:     a.bugs.size,
+      passRate: (a.passed + a.failed) > 0
+        ? Math.round((a.passed / (a.passed + a.failed)) * 100)
+        : null,
+    }))
+    .sort((a, b) => (b.failed - a.failed) || (b.passed + b.failed) - (a.passed + a.failed))
+
+  // Finalize tester rows
+  const byTester = [...testerMap.values()]
+    .map(t => ({
+      ...t,
+      bugs:     t.bugs.size,
+      total:    t.passed + t.failed,
+      passRate: (t.passed + t.failed) > 0
+        ? Math.round((t.passed / (t.passed + t.failed)) * 100)
+        : null,
+    }))
+    .sort((a, b) => b.total - a.total)
+
+  const totalPassed = byArtifact.reduce((s, a) => s + a.passed, 0)
+  const totalFailed = byArtifact.reduce((s, a) => s + a.failed, 0)
+  const summary = {
+    passed:    totalPassed,
+    failed:    totalFailed,
+    total:     totalPassed + totalFailed,
+    passRate:  (totalPassed + totalFailed) > 0
+      ? Math.round((totalPassed / (totalPassed + totalFailed)) * 100)
+      : null,
+  }
+
+  return { summary, byArtifact, byTester, failures }
+}
