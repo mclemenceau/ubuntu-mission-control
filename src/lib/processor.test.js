@@ -167,4 +167,21 @@ describe('processor', () => {
     expect(products[1]).toMatchObject({ id: 2, _changeKind: 'new' })
     expect(typeof products[1]._changedAt).toBe('number')
   })
+
+  it('re-renders a card whose respin got queued without flagging a change', () => {
+    const base = {
+      id: 1,
+      status: 'UNDECIDED',
+      tests: { passed: 0, failed: 0, inProgress: 0, notStarted: 0 },
+      bugs: [],
+    }
+    const current = [{ ...base, respinQueued: false }]
+
+    const { products, changed } = diffProducts(current, [{ ...base, respinQueued: true }])
+
+    expect(changed).toBe(true)
+    expect(products[0]).not.toBe(current[0])
+    expect(products[0].respinQueued).toBe(true)
+    expect(products[0]._changeKind).toBeUndefined()
+  })
 })

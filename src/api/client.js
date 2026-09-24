@@ -1,4 +1,6 @@
 const API_BASE = import.meta.env.PROD ? 'https://tests-api.ubuntu.com' : ''
+// Test Observer's web UI, where signed-in users perform actions such as respins.
+export const TO_FRONTEND_BASE = import.meta.env.VITE_TO_FRONTEND_URL ?? 'https://tests.ubuntu.com'
 const FETCH_TIMEOUT_MS = 30_000
 const TTL_5MIN = 5 * 60 * 1000
 
@@ -64,6 +66,11 @@ export const fetchArtefact = artefactId =>
 
 export const fetchBuilds = artefactId =>
   cachedFetch(`/v1/artefacts/${artefactId}/builds`, TTL_5MIN)
+
+// Respin requests waiting for cdimage, which polls this queue every 5 minutes
+// and removes an entry when it starts the rebuild. Live state - never cached.
+export const fetchImageRerunQueue = () =>
+  apiFetch('/v1/test-executions/reruns?family=image&environment=cdimage.ubuntu.com')
 
 // Test results for a completed execution are immutable once recorded -
 // cache for the full session so the snapshot panel costs nothing extra.
