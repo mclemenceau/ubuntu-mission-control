@@ -457,6 +457,12 @@ DELETE /v1/test-executions/reruns        — body: {"test_execution_ids": [1,2,3
 ]
 ```
 
+#### Image respins (cdimage)
+
+cdimage publishes every image as an `Image build` execution on environment `cdimage.ubuntu.com`. Its `rebuild-requests --use-test-observer` cron job (every 5 minutes, per series) reads `GET /v1/test-executions/reruns?family=image&environment=cdimage.ubuntu.com`, keeps the non-archived entries of its series, runs the matching `for-project <os> cron.<image type>` build and deletes each entry it consumes. A rerun request on an image's latest `Image build` execution is therefore a respin request.
+
+Mission Control reads this queue (currently readable without auth) to show queued respins, but cannot create requests itself: the session cookie is `SameSite=Lax` on `tests-api.ubuntu.com`, so browsers don't send it from another site such as GitHub Pages. Respins are requested from Test Observer's own page, `https://tests.ubuntu.com/#/respin?release=<codename>`, which handles sign-in and shows what was queued.
+
 ---
 
 ### Test Results (cross-execution search)

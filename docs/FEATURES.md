@@ -36,6 +36,12 @@ Detailed feature reference for Ubuntu Mission Control.
 
   ![Auto refresh control](screenshots/auto-refresh-control.png)
 
+- **Respin All Images** - Requests a respin of every image in the selected release through Test Observer. The button opens Test Observer's respin page, where you sign in with Ubuntu One, review the images and confirm. Test Observer checks permissions (admins, or teams with rerun rights) and queues the requests; cdimage picks them up every 5 minutes. Mission Control never handles credentials. While a respin waits in the queue, its card shows **⟳ queued** and the header an "N queued" count.
+
+  ![Respin All Images button and queued respins](screenshots/respin-all-images.png)
+
+  ![Respin confirmation dialog](screenshots/respin-dialog.png)
+
 - **Three-phase progressive loading** - Artifact cards render first, then test execution chips, then detailed test result and bug reference counts.
 
 - **Launchpad bug extraction** - Launchpad bug numbers are parsed from structured issues and freeform test result comments.
