@@ -83,6 +83,12 @@
   {/key}
   <div class="chip-top">
     <span class="chip-name">{product.displayName}</span>
+    {#if product.respinQueued}
+      <span
+        class="respin-badge"
+        title="Respin queued: cdimage checks every 5 minutes; the new build appears here once published"
+      >⟳ queued</span>
+    {/if}
     {#if statusIcon}
       <span class="chip-icon {cardClass}">{statusIcon}</span>
     {/if}
@@ -180,6 +186,18 @@
     font-weight: 700;
     flex-shrink: 0;
   }
+  .respin-badge {
+    flex-shrink: 0;
+    font-size: 0.78rem;
+    font-weight: 700;
+    color: var(--accent);
+    border: 1px solid var(--accent);
+    border-radius: 3px;
+    padding: 0.05em 0.35em;
+    line-height: 1.2;
+    white-space: nowrap;
+  }
+
   .chip-icon.approved { color: var(--green); }
   .chip-icon.failed   { color: var(--red);   }
 

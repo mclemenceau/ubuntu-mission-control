@@ -21,6 +21,8 @@
     onNotifToggle = () => {},
     searchFilter     = '',
     onSearchChange   = () => {},
+    respinQueuedCount = null,
+    onRespinClick     = () => {},
   } = $props()
 
   let selectedRelease = $derived(releases[selectedIndex])
@@ -83,6 +85,18 @@
       <span class="milestone-meta">
         {productCount} builds · {todayDisplay}
       </span>
+      <button
+        class="respin-btn"
+        onclick={onRespinClick}
+        disabled={!productCount}
+        title="Review and confirm a respin of every image in Test Observer"
+      >⟳ Respin All Images ↗</button>
+      {#if respinQueuedCount}
+        <span
+          class="respin-queued"
+          title="Respins waiting for cdimage, which checks every 5 minutes"
+        >{respinQueuedCount} queued</span>
+      {/if}
     {/if}
   </div>
 
@@ -195,6 +209,35 @@
   .milestone-meta {
     color: var(--text-muted);
     font-size: 0.88rem;
+  }
+
+  .respin-btn {
+    background: none;
+    border: 1px solid var(--accent);
+    color: var(--accent);
+    font-family: inherit;
+    font-size: 0.85rem;
+    font-weight: 700;
+    padding: 0.25rem 0.65rem;
+    border-radius: 4px;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: background 0.15s, color 0.15s;
+  }
+  .respin-btn:hover:not(:disabled) {
+    background: var(--accent);
+    color: #fff;
+  }
+  .respin-btn:disabled {
+    opacity: 0.4;
+    cursor: default;
+  }
+
+  .respin-queued {
+    color: var(--accent);
+    font-size: 0.85rem;
+    font-weight: 700;
+    white-space: nowrap;
   }
 
   .search-box {

@@ -205,13 +205,19 @@ export function diffProducts(current, next) {
       merged.push({ ...prev, ...item, _changedAt: Date.now(), _changeKind, _prev })
       changed = true
     } else {
+      let kept = prev   // same reference — Svelte won't re-render this card
       // Strip stale change metadata so the next diff doesn't re-emit notifications
       if (prev._changeKind !== undefined) {
         const { _changeKind, _prev, _changedAt, ...clean } = prev
-        merged.push(clean)
-      } else {
-        merged.push(prev)   // same reference — Svelte won't re-render this card
+        kept = clean
       }
+      // A respin being queued or picked up isn't a build change: re-render
+      // the card without flagging it for notifications.
+      if (item.respinQueued !== prev.respinQueued) {
+        kept = { ...kept, respinQueued: item.respinQueued }
+        changed = true
+      }
+      merged.push(kept)
     }
   }
 

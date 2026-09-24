@@ -17,7 +17,9 @@
   import BugsPanel from './components/BugsPanel.svelte'
   import TestSnapshotPanel from './components/TestSnapshotPanel.svelte'
   import TestingPage from './components/TestingPage.svelte'
+  import RespinDialog from './components/RespinDialog.svelte'
   import { generateNotifications } from './lib/notifications.js'
+  import { loadRespinQueue, applyRespinQueue } from './lib/respin.js'
 
   // ── Milestone ──────────────────────────────────────────────────
   let releases      = $state([])
@@ -60,6 +62,14 @@
 
   // ── Test snapshot panel ───────────────────────────────────────
   let testSnapshotOpen = $state(false)
+
+  // ── Respins ───────────────────────────────────────────────────
+  // Set of artefact IDs with a respin queued, or null when the queue is unknown
+  let respinQueue      = $state(null)
+  let respinDialogOpen = $state(false)
+  let respinQueuedCount = $derived(
+    respinQueue === null ? null : products.filter(p => p.respinQueued).length
+  )
 
   // ── Load state ────────────────────────────────────────────────
   // loadPhase: null = idle, 'initial' = first load (shows overlay),
@@ -114,6 +124,9 @@
         products = [...items]
       }
 
+      // Read the respin queue alongside phases 2–3
+      const respinQueuePromise = loadRespinQueue(ms.release)
+
       // Phase 2 — test executions
       loadLabel = 'Fetching test executions…'
       loadPct   = 30
@@ -127,6 +140,9 @@
       await enrichWithBugs(items, (done, total) => {
         loadPct = 55 + Math.round((done / total) * 40)
       })
+
+      respinQueue = await respinQueuePromise
+      for (const item of items) item.respinQueued = respinQueue?.has(item.id) ?? false
 
       // Merge: background diff preserves object identity for unchanged cards
       if (background) {
@@ -225,6 +241,7 @@
     selectedIndex = index
     _stopCountdown()
     products = []
+    respinQueue = null
     loadDashboard(false)
   }
 
@@ -298,17 +315,34 @@
   }
 
   // ──────────────────────────────────────────────────────────────
+  // Respin queue refresh
+  // ──────────────────────────────────────────────────────────────
+  // Coming back from the Test Observer tab: show newly queued respins now
+  // rather than on the next full refresh.
+  async function onVisibilityChange() {
+    if (document.visibilityState !== 'visible' || _loading) return
+    const release = selectedRelease?.release
+    if (!release || products.length === 0) return
+    const queue = await loadRespinQueue(release)
+    if (selectedRelease?.release !== release) return   // release switched meanwhile
+    respinQueue = queue
+    products = applyRespinQueue(products, queue)
+  }
+
+  // ──────────────────────────────────────────────────────────────
   // Lifecycle
   // ──────────────────────────────────────────────────────────────
   onMount(() => {
     clockStr   = fmtTime(new Date())
     _clockTimer = setInterval(() => { clockStr = fmtTime(new Date()) }, 1000)
+    document.addEventListener('visibilitychange', onVisibilityChange)
     loadDashboard(false)
   })
 
   onDestroy(() => {
     _stopCountdown()
     clearInterval(_clockTimer)
+    document.removeEventListener('visibilitychange', onVisibilityChange)
   })
 </script>
 
@@ -332,7 +366,17 @@
     {onIntervalChange}
     {onManualRefresh}
     onNotifToggle={openNotifPanel}
+    {respinQueuedCount}
+    onRespinClick={() => respinDialogOpen = true}
   />
+
+  {#if respinDialogOpen && selectedRelease}
+    <RespinDialog
+      release={selectedRelease.release}
+      imageCount={products.length}
+      onclose={() => respinDialogOpen = false}
+    />
+  {/if}
 
   <NotificationPanel
     open={notifOpen}
