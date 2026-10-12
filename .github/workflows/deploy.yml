@@ -1,5 +1,10 @@
 name: Deploy to GitHub Pages
 
+# The github-pages environment only accepts deployments from main, so this
+# workflow always runs from main. It also builds the feat/vanilla-framework
+# experiment into /ubuntu-mission-control/vanilla/. After pushing that
+# branch, refresh the site with: gh workflow run deploy.yml
+
 on:
   push:
     branches: [main]
@@ -19,12 +24,25 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/vanilla-framework
+          path: experiments/vanilla
       - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            experiments/vanilla/package-lock.json
       - run: npm ci
       - run: npm run build
+      - name: Build vanilla experiment
+        working-directory: experiments/vanilla
+        run: |
+          npm ci
+          npm run build
+          cp -r dist "$GITHUB_WORKSPACE/dist/vanilla"
       - uses: actions/upload-pages-artifact@v3
         with:
           path: dist
