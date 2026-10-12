@@ -43,9 +43,9 @@ describe('utils', () => {
 
   it('returns color classes from percentages', () => {
     expect(pctColor(null)).toBe('neutral')
-    expect(pctColor(90)).toBe('green')
-    expect(pctColor(60)).toBe('amber')
-    expect(pctColor(20)).toBe('red')
+    expect(pctColor(90)).toBe('positive')
+    expect(pctColor(60)).toBe('caution')
+    expect(pctColor(20)).toBe('negative')
   })
 
   it('formats countdown values', () => {

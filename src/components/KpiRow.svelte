@@ -14,7 +14,7 @@
     value={kpis.buildsToday}
     sub="artifacts built on {today}"
     pct={null}
-    color="blue"
+    tone="information"
     delta={deltas?.builds ?? 0}
   />
   <KpiCard
@@ -22,7 +22,7 @@
     value="{kpis.approved.count}/{kpis.approved.total}"
     sub="{kpis.approved.pct !== null ? kpis.approved.pct + '% ' : ''}approved"
     pct={kpis.approved.pct}
-    color={pctColor(kpis.approved.pct)}
+    tone={pctColor(kpis.approved.pct)}
     delta={deltas?.approved ?? 0}
   />
   <KpiCard
@@ -30,7 +30,7 @@
     value={kpis.tests.total}
     sub="{kpis.tests.passed} pass · {kpis.tests.failed} fail"
     pct={kpis.tests.total > 0 ? Math.round(kpis.tests.passed / kpis.tests.total * 100) : null}
-    color="blue"
+    tone="information"
     delta={deltas?.tests ?? 0}
     onclick={kpis.tests.total > 0 ? onTestsClick : null}
   />
@@ -39,7 +39,7 @@
     value={kpis.passRate.pct !== null ? kpis.passRate.pct + '%' : '—'}
     sub="passed / (passed + failed)"
     pct={kpis.passRate.pct}
-    color={pctColor(kpis.passRate.pct)}
+    tone={pctColor(kpis.passRate.pct)}
     delta={deltas?.passed ?? 0}
   />
   <KpiCard
@@ -47,7 +47,7 @@
     value={kpis.bugs}
     sub={kpis.bugs === 0 ? 'No LP bugs referenced' : `LP bug${kpis.bugs !== 1 ? 's' : ''} in test comments`}
     pct={kpis.bugs === 0 ? 100 : null}
-    color={kpis.bugs === 0 ? 'green' : kpis.bugs <= 3 ? 'amber' : 'red'}
+    tone={kpis.bugs === 0 ? 'positive' : kpis.bugs <= 3 ? 'caution' : 'negative'}
     delta={deltas?.bugs ?? 0}
     onclick={kpis.bugs > 0 ? onBugsClick : null}
   />
@@ -55,11 +55,11 @@
 
 <style>
   .kpi-row {
-    flex-shrink: 0;
+    background: var(--vf-color-background-default);
+    border-bottom: 1px solid var(--vf-color-border-low-contrast);
     display: grid;
+    flex-shrink: 0;
     grid-template-columns: repeat(5, 1fr);
-    border-bottom: 1px solid var(--border);
-    background: var(--bg-panel);
   }
 
   /* Remove right border from last card */

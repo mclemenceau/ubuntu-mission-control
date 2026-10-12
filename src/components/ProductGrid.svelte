@@ -38,7 +38,9 @@
         // Green (age=0) → orange-red (age=7) → grey (stale)
         const t     = Math.min(age === 999 ? 1 : age / 7, 1)
         const h     = Math.round(140 - t * 110)
-        const color = age === 999 ? '#3a3a3a' : `hsl(${h},78%,48%)`
+        const color = age === 999
+          ? 'var(--vf-color-text-inactive)'
+          : `hsl(${h},78%,42%)`
         // Sort stale items newest → oldest, then alphabetically by name
         if (age === 999) items.sort((a, b) => (a.displayName ?? '').localeCompare(b.displayName ?? ''))
         // Sort non-stale items alphabetically by name
@@ -51,7 +53,7 @@
 </script>
 
 {#if products.length === 0}
-  <div class="empty">No artifacts found.</div>
+  <p class="u-text--muted empty">No artifacts found.</p>
 {:else}
   <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
   <div class="swimlanes" bind:this={gridEl} onkeydown={onGridKeydown} role="list">
@@ -81,63 +83,61 @@
   .swimlanes {
     display: flex;
     flex-direction: column;
-    gap: 0.35rem;
+    gap: 0.5rem;
   }
 
   /* ── One lane = label rail + wrapping chips ─── */
   .lane {
-    display: flex;
     align-items: flex-start;
-    gap: 0;
+    display: flex;
   }
 
   /* Left rail */
   .rail {
-    flex-shrink: 0;
-    width: 88px;
+    align-items: center;
     display: flex;
     flex-direction: column;
-    align-items: center;
-    padding-top: 0.6rem;
-    gap: 0.28rem;
+    flex-shrink: 0;
+    gap: 0.25rem;
+    padding-top: 0.5rem;
+    width: 5.5rem;
   }
 
   .rail-dot {
-    width: 9px;
-    height: 9px;
-    border-radius: 50%;
     background: var(--lane-color);
+    border-radius: 50%;
+    height: 0.5rem;
+    width: 0.5rem;
   }
 
   .rail-label {
-    font-size: 0.78rem;
-    font-weight: 700;
-    letter-spacing: 0.07em;
-    text-transform: uppercase;
     color: var(--lane-color);
-    line-height: 1;
+    font-size: 0.75rem;
+    font-weight: 550;
+    letter-spacing: 0.06em;
+    line-height: 1rem;
+    text-transform: uppercase;
   }
 
   .rail-count {
-    font-size: 0.68rem;
-    color: var(--text-muted);
+    color: var(--vf-color-text-muted);
+    font-size: 0.75rem;
     font-variant-numeric: tabular-nums;
+    line-height: 1rem;
   }
 
   /* Chip area */
   .chips {
-    flex: 1;
+    border-left: 1px solid var(--vf-color-border-low-contrast);
     display: flex;
+    flex: 1;
     flex-wrap: wrap;
     gap: 0.5rem;
-    border-left: 1px solid var(--border);
-    padding: 0.35rem 0 0.35rem 0.75rem;
-    min-height: 84px;
+    min-height: 5.25rem;
+    padding: 0.25rem 0 0.25rem 0.75rem;
   }
 
   .empty {
-    color: var(--text-dim);
-    font-size: 0.875rem;
     padding: 2rem;
   }
 </style>

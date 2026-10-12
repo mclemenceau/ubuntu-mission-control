@@ -27,7 +27,7 @@ make serve     # build + preview production bundle
 |---|---|
 | Framework | Svelte 5 (runes: `$state`, `$derived`, `$props`) |
 | Build tool | Vite 6 |
-| Styling | Vanilla CSS with custom properties — no UI framework |
+| Styling | [Vanilla Framework](https://vanillaframework.io) (SCSS) + scoped Svelte styles using Vanilla's `--vf-color-*` tokens |
 | Data | Vanilla `fetch` — no HTTP client library |
 
 ---
@@ -43,12 +43,13 @@ src/
     processor.js       — data pipeline: build items → enrich executions → enrich bugs/results
     utils.js           — date helpers, color logic, formatting
   components/
-    Header.svelte      — logo, release selector, clock
+    Header.svelte      - Vanilla navigation, page links, release selector, clock
+    SidePanel.svelte   - shared slide-in panel (Vanilla p-panel)
     RefreshControl.svelte — auto-refresh toggle + interval + countdown + manual button
     KpiCard.svelte / KpiRow.svelte
     ProductCard.svelte / ProductGrid.svelte
   App.svelte           — root: state, load pipeline, timers
-  app.css              — CSS custom properties + global reset
+  styles/main.scss     - Vanilla imports (only the patterns used), app tokens
 milestones.json        — release/build configuration
 ```
 
@@ -81,6 +82,18 @@ Phase 3 — Individual test results + bugs
 ```
 
 **Background refresh** fetches fresh data through the same pipeline, then calls `diffProducts()` to merge it into the current state — only cards whose status/tests/bugs actually changed are re-rendered.
+
+---
+
+## Theming
+
+The app uses Vanilla's theme classes on `<html>`: `is-light` (default) or
+`is-dark`, toggled from the header and remembered in `localStorage`. Use
+Vanilla tokens (`--vf-color-text-default`, `--vf-color-background-*`, ...)
+for UI chrome, and the app tokens `--mc-positive`, `--mc-negative`,
+`--mc-caution`, `--mc-information` for data marks so they adapt per theme.
+Prefer Vanilla patterns (`p-button`, `p-chip`, `p-status-label`,
+`p-segmented-control`, `p-modal`, ...) over custom components.
 
 ---
 

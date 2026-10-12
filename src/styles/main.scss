@@ -1,0 +1,152 @@
+// ── Vanilla Framework settings ──────────────────────────────────
+// Dense dashboard: keep 1rem = 16px on large screens too.
+@use 'sass:map';
+@use 'vanilla-framework' as * with (
+  $increase-font-size-on-larger-screens: false
+);
+
+// Only the Vanilla parts the dashboard actually uses.
+@include vf-base;
+@include vf-l-application-panels;
+@include vf-p-badge;
+@include vf-p-buttons;
+@include vf-p-chip;
+@include vf-p-forms;
+@include vf-p-headings;
+@include vf-p-icons-common;
+@include vf-p-icon-sizes;
+@include vf-p-icon-close;
+@include vf-p-icon-error;
+@include vf-p-icon-external-link;
+@include vf-p-icon-image;
+@include vf-p-icon-info;
+@include vf-p-icon-notifications;
+@include vf-p-icon-restart;
+@include vf-p-icon-search;
+@include vf-p-icon-spinner;
+@include vf-p-icon-status;
+@include vf-p-icon-submit-bug;
+@include vf-p-icon-success;
+@include vf-p-icon-warning;
+@include vf-p-modal;
+@include vf-p-navigation;
+@include vf-p-notification;
+@include vf-p-search-box;
+@include vf-p-segmented-control;
+@include vf-p-status-label;
+@include vf-p-switch;
+@include vf-p-tabs;
+@include vf-u-animations;
+@include vf-u-off-screen;
+@include vf-u-text-muted;
+@include vf-u-truncate;
+
+// ── App tokens ──────────────────────────────────────────────────
+// Status colours for data marks (bars, counts, card rails). Light
+// themes use the Vanilla semantic palette; the dark theme uses the
+// tinted variants Vanilla itself uses on dark backgrounds.
+:root,
+.is-light,
+.is-paper {
+  --mc-brand: #{$color-brand};
+  --mc-font-mono: #{$font-monospace};
+  --mc-positive: #{$color-positive};
+  --mc-negative: #{$color-negative};
+  --mc-caution: #{$color-caution};
+  --mc-information: #{$color-information};
+  --mc-shadow: rgb(0 0 0 / 15%);
+}
+
+.is-dark {
+  --mc-positive: #{map.get($colors-dark-theme--tinted-borders, positive)};
+  --mc-negative: #{map.get($colors-dark-theme--tinted-borders, negative)};
+  --mc-caution: #{map.get($colors-dark-theme--tinted-borders, caution)};
+  --mc-information: #{map.get($colors-dark-theme--tinted-borders, information)};
+  --mc-shadow: rgb(0 0 0 / 50%);
+}
+
+// ── App shell ───────────────────────────────────────────────────
+html,
+body,
+#app {
+  height: 100%;
+  overflow: hidden;
+}
+
+body {
+  background: var(--vf-color-background-alt);
+  color: var(--vf-color-text-default);
+}
+
+// Uppercase micro-heading used for panel and section titles.
+.mc-label {
+  color: var(--vf-color-text-muted);
+  font-size: 0.75rem;
+  font-weight: 550;
+  letter-spacing: 0.06em;
+  line-height: 1rem;
+  margin: 0;
+  padding: 0;
+  text-transform: uppercase;
+}
+
+// Bordered surface used for sections, KPI tiles and table panels.
+.mc-surface {
+  background: var(--vf-color-background-default);
+  border: 1px solid var(--vf-color-border-low-contrast);
+  padding: 1rem;
+}
+
+// Compact table for dense dashboard panels.
+.mc-table {
+  margin-bottom: 0;
+  // Size numeric columns to their content (Vanilla defaults to fixed).
+  table-layout: auto;
+
+  th,
+  td {
+    padding-bottom: 0.25rem;
+    padding-top: 0.25rem;
+    vertical-align: middle;
+  }
+
+  thead th {
+    background: var(--vf-color-background-default);
+    position: sticky;
+    top: 0;
+    z-index: 1;
+  }
+
+  .is-numeric {
+    font-variant-numeric: tabular-nums;
+    text-align: right;
+    white-space: nowrap;
+    width: 1%;
+  }
+}
+
+.mc-text--positive { color: var(--mc-positive); }
+.mc-text--negative { color: var(--mc-negative); }
+.mc-text--caution { color: var(--mc-caution); }
+.mc-text--information { color: var(--mc-information); }
+
+// Thin progress bar (KPI tiles, loading screens).
+.mc-progress {
+  background: var(--vf-color-background-neutral-default);
+  height: 0.25rem;
+  overflow: hidden;
+
+  > span {
+    background: var(--mc-bar, var(--vf-color-text-default));
+    display: block;
+    height: 100%;
+    transition: width 0.4s ease;
+  }
+}
+
+// ── Animations ──────────────────────────────────────────────────
+@keyframes pulse {
+  0%,
+  100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}

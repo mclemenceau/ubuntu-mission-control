@@ -1,8 +1,9 @@
 <script>
   import { onMount } from 'svelte'
-  import { fmtDate } from '../lib/utils.js'
+  import { fmtDate, pctColor } from '../lib/utils.js'
   import { clearCache } from '../api/client.js'
   import BugPanel from './BugPanel.svelte'
+  import KpiCard from './KpiCard.svelte'
   import {
     buildTestingDataset,
     computeTestingKpis,
@@ -127,13 +128,6 @@
   })
 
   // ── Helpers ──────────────────────────────────────────────────────
-  function pctColorClass(pct) {
-    if (pct === null || pct === undefined) return 'neutral'
-    if (pct >= 80) return 'green'
-    if (pct >= 50) return 'amber'
-    return 'red'
-  }
-
   function shortDate(iso) {
     // "2026-04-15" → "Apr 15"
     const d = new Date(iso + 'T00:00:00')
@@ -141,6 +135,12 @@
   }
 
   const TIMEFRAMES = [7, 14, 30, 60, 90]
+
+  const TESTER_MODES = [
+    { id: 'all',       label: 'All'       },
+    { id: 'manual',    label: 'Manual'    },
+    { id: 'automated', label: 'Automated' },
+  ]
 </script>
 
 <BugPanel open={bugPanelOpen} bugs={bugList} onClose={() => bugPanelOpen = false} />
@@ -148,25 +148,30 @@
 <div class="testing-page">
 
   <!-- ── Filter bar ────────────────────────────────────────── -->
-  <div class="filter-bar">
+  <div class="mc-surface filter-bar">
     <div class="filter-group">
-      <span class="filter-label">Timeframe</span>
-      <div class="pill-row">
-        {#each TIMEFRAMES as days}
-          <button
-            class="pill"
-            class:active={timeframeDays === days}
-            onclick={() => { timeframeDays = days; loadData() }}
-          >{days}d</button>
-        {/each}
+      <span class="mc-label">Timeframe</span>
+      <div class="p-segmented-control is-dense">
+        <div class="p-segmented-control__list" role="tablist" aria-label="Timeframe">
+          {#each TIMEFRAMES as days}
+            <button
+              class="p-segmented-control__button"
+              role="tab"
+              aria-selected={timeframeDays === days}
+              onclick={() => { timeframeDays = days; loadData() }}
+            >{days}d</button>
+          {/each}
+        </div>
       </div>
     </div>
 
-    <span class="filter-sep">|</span>
-
     <div class="filter-group">
-      <span class="filter-label">OS</span>
-      <select bind:value={filterOS} disabled={isLoading || availableOS.length === 0}>
+      <label class="mc-label" for="filter-os">OS</label>
+      <select
+        id="filter-os"
+        bind:value={filterOS}
+        disabled={isLoading || availableOS.length === 0}
+      >
         <option value="">All</option>
         {#each availableOS as os}
           <option value={os}>{os}</option>
@@ -175,8 +180,12 @@
     </div>
 
     <div class="filter-group">
-      <span class="filter-label">Tester</span>
-      <select bind:value={filterTester} disabled={isLoading || availableTesters.length === 0}>
+      <label class="mc-label" for="filter-tester">Tester</label>
+      <select
+        id="filter-tester"
+        bind:value={filterTester}
+        disabled={isLoading || availableTesters.length === 0}
+      >
         <option value="">All testers</option>
         {#each availableTesters as t}
           <option value={t}>{t}</option>
@@ -184,7 +193,7 @@
       </select>
     </div>
 
-    <div class="filter-meta">
+    <div class="filter-meta u-text--muted">
       {dateFrom} → {dateTo}
       {#if !isLoading && rawEntries.length > 0}
         · {entries.length} results
@@ -192,101 +201,109 @@
     </div>
 
     {#if !isLoading && rawEntries.length > 0}
-      <button class="refresh-btn" onclick={() => loadData(true)} title="Refresh data">↺ Refresh</button>
+      <button
+        class="p-button is-dense has-icon"
+        onclick={() => loadData(true)}
+        title="Refresh data"
+      ><i class="p-icon--restart"></i><span>Refresh</span></button>
     {/if}
   </div>
 
   <!-- ── Loading state ─────────────────────────────────────── -->
   {#if isLoading}
     <div class="loading-wrap">
-      <div class="loading-box">
-        <div class="loading-title">Loading Testing Data</div>
-        <div class="loading-label">{loadLabel}</div>
-        <div class="loading-track">
-          <div class="loading-fill" style="width: {loadPct}%"></div>
+      <div class="mc-surface loading-box">
+        <h2 class="mc-label">Loading testing data</h2>
+        <p class="u-text--muted">{loadLabel}</p>
+        <div class="mc-progress" style="--mc-bar: var(--mc-brand)">
+          <span style="width: {loadPct}%"></span>
         </div>
-        <div class="loading-pct">{loadPct}%</div>
+        <p class="u-text--muted loading-pct">{loadPct}%</p>
       </div>
     </div>
 
   <!-- ── Error state ────────────────────────────────────────── -->
   {:else if loadError}
-    <div class="error-msg">Error: {loadError}</div>
+    <div class="p-notification--negative">
+      <div class="p-notification__content">
+        <h5 class="p-notification__title">Error</h5>
+        <p class="p-notification__message">{loadError}</p>
+      </div>
+    </div>
 
   <!-- ── Empty state ────────────────────────────────────────── -->
   {:else if rawEntries.length === 0}
     <div class="empty-state">
-      <div class="empty-icon">◎</div>
-      <div class="empty-title">No test results found</div>
-      <div class="empty-sub">
+      <h3 class="p-heading--5">No test results found</h3>
+      <p class="u-text--muted">
         No manual test executions recorded for
         {selectedRelease?.release ?? 'the selected release'}
         in the last {timeframeDays} days.
-      </div>
+      </p>
     </div>
 
   <!-- ── Main content ───────────────────────────────────────── -->
   {:else}
 
     <!-- KPI strip -->
-    <div class="kpi-strip">
-      <div class="kpi-card">
-        <div class="kpi-value">{kpis.total}</div>
-        <div class="kpi-label">Test Results</div>
-        <div class="kpi-sub">{kpis.executions} execution{kpis.executions !== 1 ? 's' : ''}</div>
-      </div>
-
-      <div class="kpi-card {pctColorClass(kpis.passRate)}">
-        <div class="kpi-value">{kpis.passRate !== null ? kpis.passRate + '%' : '—'}</div>
-        <div class="kpi-label">Pass Rate</div>
-        <div class="kpi-bar-wrap">
-          <div class="kpi-bar-fill" style="width: {kpis.passRate ?? 0}%"></div>
-        </div>
-        <div class="kpi-sub">{kpis.passed} passed / {kpis.failed} failed</div>
-      </div>
-
-      <div class="kpi-card {kpis.failed > 0 ? 'red' : 'neutral'}">
-        <div class="kpi-value">{kpis.failed}</div>
-        <div class="kpi-label">Failures</div>
-        <div class="kpi-sub">
-          {kpis.total > 0 ? Math.round((kpis.failed / kpis.total) * 100) : 0}% of tests
-        </div>
-      </div>
-
-      <button
-        class="kpi-card kpi-card--btn {kpis.bugs === 0 ? 'green' : kpis.bugs <= 3 ? 'amber' : 'red'}"
-        onclick={() => bugPanelOpen = true}
-        disabled={kpis.bugs === 0}
-        title={kpis.bugs > 0 ? 'View filed bugs' : undefined}
-      >
-        <div class="kpi-value">{kpis.bugs}</div>
-        <div class="kpi-label">Bugs Filed</div>
-        <div class="kpi-sub">unique LP bugs</div>
-      </button>
-
-      <div class="kpi-card blue">
-        <div class="kpi-value">{kpis.testers}</div>
-        <div class="kpi-label">Active Testers</div>
-        <div class="kpi-sub">{kpis.artifacts} artifact{kpis.artifacts !== 1 ? 's' : ''} covered</div>
-      </div>
+    <div class="mc-surface kpi-strip">
+      <KpiCard
+        label="Test results"
+        value={kpis.total}
+        sub="{kpis.executions} execution{kpis.executions !== 1 ? 's' : ''}"
+        pct={null}
+      />
+      <KpiCard
+        label="Pass rate"
+        value={kpis.passRate !== null ? kpis.passRate + '%' : '—'}
+        sub="{kpis.passed} passed / {kpis.failed} failed"
+        pct={kpis.passRate}
+        tone={pctColor(kpis.passRate)}
+      />
+      <KpiCard
+        label="Failures"
+        value={kpis.failed}
+        sub="{kpis.total > 0
+          ? Math.round((kpis.failed / kpis.total) * 100) : 0}% of tests"
+        pct={null}
+        tone={kpis.failed > 0 ? 'negative' : 'neutral'}
+      />
+      <KpiCard
+        label="Bugs filed"
+        value={kpis.bugs}
+        sub="unique LP bugs"
+        pct={null}
+        tone={kpis.bugs === 0 ? 'positive' : kpis.bugs <= 3 ? 'caution' : 'negative'}
+        onclick={kpis.bugs > 0 ? () => bugPanelOpen = true : null}
+      />
+      <KpiCard
+        label="Active testers"
+        value={kpis.testers}
+        sub="{kpis.artifacts} artifact{kpis.artifacts !== 1 ? 's' : ''} covered"
+        pct={null}
+        tone="information"
+      />
     </div>
 
     <!-- Trend chart -->
-    <div class="section">
-      <div class="section-title">Daily Trend — {dateFrom} to {dateTo}</div>
+    <section class="mc-surface">
+      <h2 class="mc-label section-title">Daily trend — {dateFrom} to {dateTo}</h2>
       <div class="chart">
         {#each byDate as day}
           {@const total = day.passed + day.failed}
           {@const barH = chartMax > 0 ? Math.round((total / chartMax) * 100) : 0}
-          <div class="chart-col" title="{shortDate(day.date)}: {day.passed + day.failed} tests ({day.passed} passed, {day.failed} failed)">
+          <div
+            class="chart-col"
+            title="{shortDate(day.date)}: {total} tests ({day.passed} passed, {day.failed} failed)"
+          >
             <div class="chart-bar-area">
               {#if total > 0}
                 <div class="chart-bar" style="height: {barH}%">
-                  <div class="seg seg-failed"  style="flex: {day.failed}"></div>
-                  <div class="seg seg-passed"  style="flex: {day.passed}"></div>
+                  <div class="seg seg-failed" style="flex: {day.failed}"></div>
+                  <div class="seg seg-passed" style="flex: {day.passed}"></div>
                 </div>
               {:else}
-                <div class="chart-bar chart-bar--empty" style="height: 2px; bottom: 0; position: absolute; width: 100%"></div>
+                <div class="chart-bar chart-bar--empty"></div>
               {/if}
             </div>
             <div class="chart-date">{shortDate(day.date)}</div>
@@ -294,97 +311,116 @@
         {/each}
       </div>
       <div class="chart-legend">
-        <span class="legend-item passed">● Passed</span>
-        <span class="legend-item failed">● Failed</span>
+        <span class="mc-text--positive">● Passed</span>
+        <span class="mc-text--negative">● Failed</span>
       </div>
-    </div>
+    </section>
 
     <!-- Two-column breakdown -->
     <div class="breakdown-row">
 
       <!-- Artifact breakdown -->
-      <div class="breakdown-panel">
-        <div class="section-title">By Artifact</div>
+      <section class="mc-surface">
+        <h2 class="mc-label section-title">By artifact</h2>
         <div class="table-wrap">
-          <table>
+          <table class="mc-table">
             <thead>
               <tr>
                 <th>Artifact</th>
-                <th class="num-col">Pass</th>
-                <th class="num-col">Fail</th>
-                <th class="num-col">Rate</th>
-                <th class="num-col">Bugs</th>
+                <th class="is-numeric">Pass</th>
+                <th class="is-numeric">Fail</th>
+                <th class="is-numeric">Rate</th>
+                <th class="is-numeric">Bugs</th>
               </tr>
             </thead>
             <tbody>
               {#each byArtifact as row}
                 <tr>
                   <td>
-                    <span class="art-name">{row.displayName}</span>
+                    <strong>{row.displayName}</strong>
                     {#if row.arch}
-                      <span class="art-arch">{row.arch}</span>
+                      <span class="u-text--muted art-arch">{row.arch}</span>
                     {/if}
                   </td>
-                  <td class="num-col green-text">{row.passed}</td>
-                  <td class="num-col {row.failed > 0 ? 'red-text' : 'dim-text'}">{row.failed}</td>
-                  <td class="num-col">
+                  <td class="is-numeric mc-text--positive">{row.passed}</td>
+                  <td class="is-numeric"
+                      class:mc-text--negative={row.failed > 0}
+                      class:u-text--muted={row.failed === 0}>{row.failed}</td>
+                  <td class="is-numeric">
                     {#if row.passRate !== null}
-                      <span class="rate-badge {pctColorClass(row.passRate)}">{row.passRate}%</span>
+                      <span class="p-status-label--{pctColor(row.passRate)}">
+                        {row.passRate}%
+                      </span>
                     {:else}
-                      <span class="dim-text">—</span>
+                      <span class="u-text--muted">—</span>
                     {/if}
                   </td>
-                  <td class="num-col {row.bugs > 0 ? 'amber-text' : 'dim-text'}">{row.bugs}</td>
+                  <td class="is-numeric"
+                      class:mc-text--caution={row.bugs > 0}
+                      class:u-text--muted={row.bugs === 0}>{row.bugs}</td>
                 </tr>
               {/each}
             </tbody>
           </table>
         </div>
-      </div>
+      </section>
 
       <!-- Tester breakdown -->
-      <div class="breakdown-panel">
+      <section class="mc-surface">
         <div class="section-title-row">
-          <span class="section-title">By Tester</span>
-          <div class="mode-pills">
-            <button class="mode-pill" class:active={testerMode === 'all'}        onclick={() => testerMode = 'all'}>All</button>
-            <button class="mode-pill" class:active={testerMode === 'manual'}     onclick={() => testerMode = 'manual'}>Manual</button>
-            <button class="mode-pill" class:active={testerMode === 'automated'}  onclick={() => testerMode = 'automated'}>Automated</button>
+          <h2 class="mc-label">By tester</h2>
+          <div class="p-segmented-control is-dense">
+            <div class="p-segmented-control__list" role="tablist" aria-label="Test type">
+              {#each TESTER_MODES as mode}
+                <button
+                  class="p-segmented-control__button"
+                  role="tab"
+                  aria-selected={testerMode === mode.id}
+                  onclick={() => testerMode = mode.id}
+                >{mode.label}</button>
+              {/each}
+            </div>
           </div>
         </div>
         <div class="table-wrap">
-          <table>
+          <table class="mc-table">
             <thead>
               <tr>
                 <th>Tester</th>
-                <th class="num-col">Total</th>
-                <th class="num-col">Pass</th>
-                <th class="num-col">Fail</th>
-                <th class="num-col">Rate</th>
-                <th class="num-col">Bugs</th>
+                <th class="is-numeric">Total</th>
+                <th class="is-numeric">Pass</th>
+                <th class="is-numeric">Fail</th>
+                <th class="is-numeric">Rate</th>
+                <th class="is-numeric">Bugs</th>
               </tr>
             </thead>
             <tbody>
               {#each byTester as row}
                 <tr>
-                  <td class="tester-name">{row.tester}</td>
-                  <td class="num-col">{row.total}</td>
-                  <td class="num-col green-text">{row.passed}</td>
-                  <td class="num-col {row.failed > 0 ? 'red-text' : 'dim-text'}">{row.failed}</td>
-                  <td class="num-col">
+                  <td class="u-truncate tester-name">{row.tester}</td>
+                  <td class="is-numeric">{row.total}</td>
+                  <td class="is-numeric mc-text--positive">{row.passed}</td>
+                  <td class="is-numeric"
+                      class:mc-text--negative={row.failed > 0}
+                      class:u-text--muted={row.failed === 0}>{row.failed}</td>
+                  <td class="is-numeric">
                     {#if row.passRate !== null}
-                      <span class="rate-badge {pctColorClass(row.passRate)}">{row.passRate}%</span>
+                      <span class="p-status-label--{pctColor(row.passRate)}">
+                        {row.passRate}%
+                      </span>
                     {:else}
-                      <span class="dim-text">—</span>
+                      <span class="u-text--muted">—</span>
                     {/if}
                   </td>
-                  <td class="num-col {row.bugs > 0 ? 'amber-text' : 'dim-text'}">{row.bugs}</td>
+                  <td class="is-numeric"
+                      class:mc-text--caution={row.bugs > 0}
+                      class:u-text--muted={row.bugs === 0}>{row.bugs}</td>
                 </tr>
               {/each}
             </tbody>
           </table>
         </div>
-      </div>
+      </section>
 
     </div>
 
@@ -396,498 +432,215 @@
     display: flex;
     flex-direction: column;
     gap: 1rem;
-    padding: 0.75rem 1rem;
     min-height: 0;
+    padding: 1rem 1.5rem;
   }
 
   /* ── Filter bar ──────────────────────────────────────────── */
   .filter-bar {
-    display: flex;
     align-items: center;
-    gap: 1rem;
-    flex-wrap: wrap;
-    background: var(--bg-panel);
-    border: 1px solid var(--border-mid);
-    border-radius: 6px;
-    padding: 0.55rem 1rem;
+    display: flex;
     flex-shrink: 0;
+    flex-wrap: wrap;
+    gap: 1.5rem;
+    padding: 0.5rem 1rem;
   }
 
   .filter-group {
-    display: flex;
     align-items: center;
-    gap: 0.45rem;
-  }
-
-  .filter-label {
-    font-size: 0.78rem;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.07em;
-    color: var(--text-dim);
-    white-space: nowrap;
-  }
-
-  .pill-row {
     display: flex;
-    gap: 0.25rem;
+    gap: 0.5rem;
   }
 
-  .pill {
-    background: var(--bg-raised);
-    border: 1px solid var(--border-mid);
-    color: var(--text-muted);
-    font-family: inherit;
-    font-size: 0.8rem;
-    padding: 0.15rem 0.55rem;
-    border-radius: 12px;
-    cursor: pointer;
-    transition: background 0.15s, color 0.15s, border-color 0.15s;
-  }
-  .pill:hover {
-    color: var(--text);
-    border-color: var(--border-strong);
-  }
-  .pill.active {
-    background: var(--accent);
-    border-color: var(--accent);
-    color: #fff;
-    font-weight: 700;
+  .filter-group .p-segmented-control__button {
+    margin-bottom: 0;
   }
 
-  .filter-sep {
-    color: var(--border-strong);
-    user-select: none;
+  .filter-group label {
+    padding-top: 0;
   }
 
   select {
-    background: var(--bg-raised);
-    border: 1px solid var(--border-mid);
-    color: var(--text);
-    padding: 0.15rem 0.45rem;
-    border-radius: 3px;
-    font-size: 0.85rem;
-    font-family: inherit;
-    cursor: pointer;
-    max-width: 200px;
-  }
-  select:disabled {
-    opacity: 0.4;
-    cursor: default;
+    margin: 0;
+    max-width: 14rem;
+    width: auto;
   }
 
   .filter-meta {
+    font-size: 0.875rem;
     margin-left: auto;
-    font-size: 0.8rem;
-    color: var(--text-dim);
     white-space: nowrap;
   }
 
-  .refresh-btn {
-    background: none;
-    border: 1px solid var(--border-strong);
-    color: var(--text-muted);
-    font-size: 0.82rem;
-    font-family: inherit;
-    padding: 0.2rem 0.65rem;
-    border-radius: 4px;
-    cursor: pointer;
-    transition: color 0.15s, border-color 0.15s;
-  }
-  .refresh-btn:hover {
-    color: var(--text);
-    border-color: var(--accent);
+  .filter-bar > button {
+    margin: 0;
   }
 
   /* ── Loading ─────────────────────────────────────────────── */
   .loading-wrap {
-    display: flex;
     align-items: center;
-    justify-content: center;
+    display: flex;
     flex: 1;
-    min-height: 200px;
+    justify-content: center;
+    min-height: 12rem;
   }
 
   .loading-box {
-    background: var(--bg-panel);
-    border: 1px solid var(--border-mid);
-    border-radius: 6px;
+    min-width: 20rem;
     padding: 2rem 3rem;
     text-align: center;
-    min-width: 320px;
   }
 
-  .loading-title {
-    font-size: 0.75rem;
-    font-weight: 700;
-    letter-spacing: 0.1em;
-    text-transform: uppercase;
-    color: var(--accent);
+  .loading-box .mc-label {
     margin-bottom: 1rem;
   }
 
-  .loading-label {
-    font-size: 0.875rem;
-    color: var(--text-muted);
+  .loading-box p {
     margin-bottom: 0.75rem;
-    min-height: 1.25em;
+    min-height: 1.5rem;
   }
 
-  .loading-track {
-    height: 4px;
-    background: var(--bg-raised);
-    border-radius: 2px;
-    overflow: hidden;
-    margin-bottom: 0.5rem;
-  }
-
-  .loading-fill {
-    height: 100%;
-    background: var(--accent);
-    border-radius: 2px;
-    transition: width 0.3s ease;
-  }
-
-  .loading-pct {
-    font-size: 0.78rem;
-    color: var(--text-dim);
-  }
-
-  /* ── Error / empty ───────────────────────────────────────── */
-  .error-msg {
-    color: var(--red);
-    padding: 1rem 1.5rem;
+  .loading-box .loading-pct {
     font-size: 0.875rem;
+    margin: 0.5rem 0 0;
   }
 
+  /* ── Empty ───────────────────────────────────────────────── */
   .empty-state {
-    display: flex;
-    flex-direction: column;
     align-items: center;
-    justify-content: center;
+    display: flex;
     flex: 1;
-    gap: 0.5rem;
-    min-height: 200px;
-    text-align: center;
+    flex-direction: column;
+    justify-content: center;
+    min-height: 12rem;
     padding: 2rem;
+    text-align: center;
   }
-  .empty-icon {
-    font-size: 2.5rem;
-    color: var(--border-strong);
-  }
-  .empty-title {
-    font-size: 1rem;
-    font-weight: 700;
-    color: var(--text-muted);
-  }
-  .empty-sub {
-    font-size: 0.875rem;
-    color: var(--text-dim);
-    max-width: 420px;
+
+  .empty-state p {
+    max-width: 26rem;
   }
 
   /* ── KPI strip ───────────────────────────────────────────── */
   .kpi-strip {
     display: grid;
-    grid-template-columns: repeat(5, 1fr);
-    gap: 0.75rem;
     flex-shrink: 0;
+    grid-template-columns: repeat(5, 1fr);
+    padding: 0;
   }
 
-  .kpi-card {
-    background: var(--bg-panel);
-    border: 1px solid var(--border-mid);
-    border-radius: 6px;
-    padding: 0.85rem 1rem;
-    display: flex;
-    flex-direction: column;
-    gap: 0.2rem;
-    transition: border-color 0.2s;
-  }
-
-  .kpi-card--btn {
-    font-family: inherit;
-    text-align: left;
-    cursor: pointer;
-  }
-  .kpi-card--btn:not(:disabled):hover {
-    border-color: var(--border-strong);
-    background: var(--surface-hover);
-  }
-  .kpi-card--btn:disabled {
-    cursor: default;
-  }
-  .kpi-card.green { border-left: 3px solid var(--green); }
-  .kpi-card.amber { border-left: 3px solid var(--amber); }
-  .kpi-card.red   { border-left: 3px solid var(--red);   }
-  .kpi-card.blue  { border-left: 3px solid var(--blue);  }
-
-  .kpi-value {
-    font-size: 1.75rem;
-    font-weight: 700;
-    font-variant-numeric: tabular-nums;
-    color: var(--text);
-    line-height: 1;
-  }
-  .kpi-card.green .kpi-value { color: var(--green); }
-  .kpi-card.amber .kpi-value { color: var(--amber); }
-  .kpi-card.red   .kpi-value { color: var(--red);   }
-  .kpi-card.blue  .kpi-value { color: var(--blue);  }
-
-  .kpi-label {
-    font-size: 0.72rem;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-    color: var(--text-dim);
-  }
-
-  .kpi-bar-wrap {
-    height: 3px;
-    background: var(--bg-raised);
-    border-radius: 2px;
-    overflow: hidden;
-    margin: 0.15rem 0;
-  }
-  .kpi-bar-fill {
-    height: 100%;
-    border-radius: 2px;
-    transition: width 0.4s ease;
-  }
-  .kpi-card.green .kpi-bar-fill { background: var(--green); }
-  .kpi-card.amber .kpi-bar-fill { background: var(--amber); }
-  .kpi-card.red   .kpi-bar-fill { background: var(--red);   }
-
-  .kpi-sub {
-    font-size: 0.78rem;
-    color: var(--text-dim);
+  .kpi-strip :global(.kpi:last-child) {
+    border-right: none;
   }
 
   /* ── Section headers ─────────────────────────────────────── */
-  .section {
-    background: var(--bg-panel);
-    border: 1px solid var(--border-mid);
-    border-radius: 6px;
-    padding: 1rem;
-    flex-shrink: 0;
-  }
-
   .section-title {
-    font-size: 0.72rem;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.1em;
-    color: var(--text-dim);
-    margin-bottom: 0.85rem;
+    margin-bottom: 1rem;
   }
 
   .section-title-row {
-    display: flex;
     align-items: center;
-    justify-content: space-between;
-    margin-bottom: 0.65rem;
-  }
-  .section-title-row .section-title {
-    margin-bottom: 0;
-  }
-
-  .mode-pills {
     display: flex;
-    gap: 0.2rem;
+    justify-content: space-between;
+    margin-bottom: 0.75rem;
   }
 
-  .mode-pill {
-    background: var(--bg-raised);
-    border: 1px solid var(--border-mid);
-    color: var(--text-muted);
-    font-family: inherit;
-    font-size: 0.72rem;
-    font-weight: 600;
-    padding: 0.1rem 0.45rem;
-    border-radius: 10px;
-    cursor: pointer;
-    transition: background 0.15s, color 0.15s, border-color 0.15s;
-  }
-  .mode-pill:hover {
-    color: var(--text);
-    border-color: var(--border-strong);
-  }
-  .mode-pill.active {
-    background: var(--accent);
-    border-color: var(--accent);
-    color: #fff;
+  .section-title-row .p-segmented-control__button {
+    margin-bottom: 0;
   }
 
   /* ── Trend chart ─────────────────────────────────────────── */
   .chart {
-    display: flex;
     align-items: flex-end;
+    display: flex;
     gap: 2px;
-    height: 120px;
-    padding-bottom: 1.6rem;
-    position: relative;
+    height: 7.5rem;
     overflow-x: auto;
     overflow-y: hidden;
+    padding-bottom: 1.5rem;
+    position: relative;
   }
 
   .chart-col {
-    display: flex;
-    flex-direction: column;
     align-items: center;
+    display: flex;
     flex: 1;
-    min-width: 22px;
+    flex-direction: column;
     height: 100%;
+    min-width: 1.375rem;
     position: relative;
   }
 
   .chart-bar-area {
-    flex: 1;
-    width: 100%;
-    display: flex;
     align-items: flex-end;
+    display: flex;
+    flex: 1;
     position: relative;
+    width: 100%;
   }
 
   .chart-bar {
-    width: 100%;
     display: flex;
     flex-direction: column-reverse;
-    border-radius: 2px 2px 0 0;
-    overflow: hidden;
     min-height: 2px;
+    overflow: hidden;
+    width: 100%;
+  }
+
+  .chart-bar--empty {
+    background: var(--vf-color-border-low-contrast);
+    height: 2px;
   }
 
   .seg {
     min-height: 1px;
   }
-  .seg-passed { background: var(--green); }
-  .seg-failed { background: var(--red); }
+  .seg-passed { background: var(--mc-positive); }
+  .seg-failed { background: var(--mc-negative); }
 
   .chart-date {
-    position: absolute;
     bottom: -1.5rem;
-    font-size: 0.62rem;
-    color: var(--text-dim);
-    white-space: nowrap;
-    transform: translateX(-50%);
+    color: var(--vf-color-text-muted);
+    font-size: 0.625rem;
     left: 50%;
+    position: absolute;
+    transform: translateX(-50%);
+    white-space: nowrap;
   }
 
   /* Show date labels only for every Nth column to avoid overlap */
-  .chart-col:nth-child(7n+1) .chart-date { display: block; }
   .chart-col:not(:nth-child(7n+1)) .chart-date { display: none; }
 
   .chart-legend {
     display: flex;
+    font-size: 0.875rem;
     gap: 1.25rem;
     margin-top: 0.5rem;
-    font-size: 0.78rem;
   }
-  .legend-item.passed { color: var(--green); }
-  .legend-item.failed { color: var(--red); }
 
   /* ── Breakdown row ───────────────────────────────────────── */
   .breakdown-row {
     display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 0.75rem;
     flex-shrink: 0;
+    gap: 1rem;
+    grid-template-columns: 1fr 1fr;
   }
 
-  .breakdown-panel {
-    background: var(--bg-panel);
-    border: 1px solid var(--border-mid);
-    border-radius: 6px;
-    padding: 1rem;
-    overflow: hidden;
+  .breakdown-row > section {
+    min-width: 0;
   }
 
   .table-wrap {
-    overflow-x: auto;
-    overflow-y: auto;
-    max-height: 320px;
+    max-height: 20rem;
+    overflow: auto;
   }
 
-  table {
-    width: 100%;
-    border-collapse: collapse;
-    font-size: 0.83rem;
-  }
-
-  thead tr {
-    border-bottom: 1px solid var(--border-mid);
-  }
-
-  th {
-    font-size: 0.7rem;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.07em;
-    color: var(--text-dim);
-    padding: 0.3rem 0.5rem;
-    text-align: left;
-    position: sticky;
-    top: 0;
-    background: var(--bg-panel);
-  }
-
-  td {
-    padding: 0.35rem 0.5rem;
-    color: var(--text-muted);
-    border-bottom: 1px solid var(--border-subtle);
-    vertical-align: middle;
-  }
-
-  tbody tr:last-child td {
-    border-bottom: none;
-  }
-
-  tbody tr:hover td {
-    background: var(--surface-faint);
-  }
-
-  .num-col {
-    text-align: right;
-    font-variant-numeric: tabular-nums;
-    white-space: nowrap;
-    width: 1%;
-  }
-
-  .art-name {
-    color: var(--text);
-    font-weight: 600;
-  }
   .art-arch {
-    margin-left: 0.35rem;
-    font-size: 0.72rem;
-    color: var(--text-dim);
-    background: var(--bg-raised);
-    padding: 0.05rem 0.35rem;
-    border-radius: 3px;
+    font-size: 0.875rem;
+    margin-left: 0.375rem;
   }
 
   .tester-name {
-    color: var(--text);
-    max-width: 200px;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+    max-width: 12.5rem;
   }
-
-  .rate-badge {
-    display: inline-block;
-    padding: 0.1rem 0.4rem;
-    border-radius: 3px;
-    font-size: 0.78rem;
-    font-weight: 700;
-  }
-  .rate-badge.green  { background: var(--green-bg); color: var(--green); border: 1px solid var(--green-border); }
-  .rate-badge.amber  { background: var(--amber-bg); color: var(--amber); border: 1px solid var(--amber-border); }
-  .rate-badge.red    { background: var(--red-bg);   color: var(--red);   border: 1px solid var(--red-border);   }
-  .rate-badge.neutral { color: var(--text-dim); }
-
-  .green-text { color: var(--green); }
-  .amber-text { color: var(--amber); }
-  .red-text   { color: var(--red);   }
-  .dim-text   { color: var(--text-dim); }
 </style>

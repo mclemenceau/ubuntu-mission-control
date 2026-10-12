@@ -2,120 +2,85 @@
   /**
    * @type {{
    *   label: string, value: string|number, sub: string,
-   *   pct: number|null, color?: string, delta?: number,
+   *   pct: number|null,
+   *   tone?: 'positive'|'caution'|'negative'|'information'|'neutral',
+   *   delta?: number,
    *   onclick?: (() => void)|null
    * }}
    */
-  let { label, value, sub, pct, color = 'neutral', delta = 0, onclick = null } = $props()
+  let {
+    label, value, sub, pct, tone = 'neutral', delta = 0, onclick = null,
+  } = $props()
 </script>
 
 <!-- Render as <button> when clickable, plain <div> otherwise -->
 {#snippet inner()}
-  <div class="label">{label}</div>
-  <div class="value-row">
-    <div class="value">{value}</div>
+  <span class="mc-label">{label}</span>
+  <span class="value-row">
+    <span class="value">{value}</span>
     {#key delta}
       {#if delta !== 0}
-        <span class="delta" class:delta-pos={delta > 0} class:delta-neg={delta < 0}>
+        <span class="delta" class:mc-text--positive={delta > 0}
+              class:mc-text--negative={delta < 0}>
           {delta > 0 ? '+' : ''}{delta}
         </span>
       {/if}
     {/key}
-  </div>
-  <div class="sub">{sub}</div>
-  <div class="bar">
-    <div class="bar-fill" style="width: {pct ?? 0}%"></div>
-  </div>
+  </span>
+  <span class="sub u-text--muted">{sub}</span>
+  <span class="mc-progress">
+    <span style="width: {pct ?? 0}%"></span>
+  </span>
 {/snippet}
 
 {#if onclick}
-  <button
-    class="kpi clickable"
-    class:green={color === 'green'}
-    class:amber={color === 'amber'}
-    class:red={color === 'red'}
-    class:blue={color === 'blue'}
-    {onclick}
-  >{@render inner()}</button>
+  <button class="kpi clickable tone-{tone}" {onclick}>{@render inner()}</button>
 {:else}
-  <div
-    class="kpi"
-    class:green={color === 'green'}
-    class:amber={color === 'amber'}
-    class:red={color === 'red'}
-    class:blue={color === 'blue'}
-  >{@render inner()}</div>
+  <div class="kpi tone-{tone}">{@render inner()}</div>
 {/if}
 
 <style>
   .kpi {
-    padding: 1rem 1.5rem;
-    border-right: 1px solid var(--border);
-    position: relative;
-    overflow: hidden;
-    /* Reset button defaults when rendered as <button> */
-    background: inherit;
-    border-top: none;
-    border-bottom: none;
-    border-left: none;
-    font: inherit;
+    background: transparent;
+    border: 0;
+    border-radius: 0;
+    border-right: 1px solid var(--vf-color-border-low-contrast);
     color: inherit;
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    margin: 0;
+    padding: 1rem 1.5rem;
     text-align: left;
     width: 100%;
   }
 
-  .kpi.clickable {
-    cursor: pointer;
-    transition: background 0.15s;
-  }
-  .kpi.clickable:hover { background: var(--surface-hover); }
-  .kpi.clickable:focus-visible {
-    outline: 2px solid var(--accent);
-    outline-offset: -2px;
-  }
-
-  .label {
-    font-size: 0.6875rem;
-    font-weight: 700;
-    letter-spacing: 0.1em;
-    text-transform: uppercase;
-    color: var(--text-dim);
-    margin-bottom: 0.4rem;
+  .kpi.clickable:hover {
+    background: var(--vf-color-background-hover);
   }
 
   .value-row {
-    display: flex;
     align-items: baseline;
+    display: flex;
     gap: 0.5rem;
   }
 
   .value {
-    font-size: 3rem;
-    font-weight: 700;
-    line-height: 1;
+    font-size: 2.5rem;
     font-variant-numeric: tabular-nums;
-    color: var(--text-muted);
+    font-weight: 550;
+    line-height: 3rem;
     transition: color 0.3s;
   }
 
   .delta {
-    font-size: 1.1rem;
-    font-weight: 700;
-    font-variant-numeric: tabular-nums;
-    padding: 0.1em 0.4em;
-    border-radius: 4px;
     animation: delta-pop 12s ease-out forwards;
+    background: var(--vf-color-background-neutral-default);
     flex-shrink: 0;
-  }
-
-  .delta-pos {
-    color: #5ddb5d;
-    background: rgba(93, 219, 93, 0.12);
-  }
-
-  .delta-neg {
-    color: var(--red);
-    background: rgba(220, 60, 60, 0.12);
+    font-size: 1.125rem;
+    font-variant-numeric: tabular-nums;
+    font-weight: 550;
+    padding: 0 0.4em;
   }
 
   @keyframes delta-pop {
@@ -127,36 +92,21 @@
 
   .sub {
     font-size: 0.875rem;
-    color: var(--text-muted);
-    margin-top: 0.3rem;
     font-variant-numeric: tabular-nums;
   }
 
-  .bar {
-    margin-top: 0.5rem;
-    height: 4px;
-    background: var(--bg-raised);
-    border-radius: 2px;
-    overflow: hidden;
+  .mc-progress {
+    display: block;
+    margin-top: 0.25rem;
   }
 
-  .bar-fill {
-    height: 100%;
-    border-radius: 2px;
-    background: var(--text-dim);
-    transition: width 0.6s ease, background 0.3s;
+  .tone-positive    { --mc-bar: var(--mc-positive); }
+  .tone-caution     { --mc-bar: var(--mc-caution); }
+  .tone-negative    { --mc-bar: var(--mc-negative); }
+  .tone-information { --mc-bar: var(--mc-information); }
+  .tone-neutral     { --mc-bar: var(--vf-color-text-muted); }
+
+  .kpi:not(.tone-neutral) .value {
+    color: var(--mc-bar);
   }
-
-  /* Color variants */
-  .green .value  { color: var(--green); }
-  .green .bar-fill { background: var(--green); }
-
-  .amber .value  { color: var(--amber); }
-  .amber .bar-fill { background: var(--amber); }
-
-  .red .value    { color: var(--red); }
-  .red .bar-fill { background: var(--red); }
-
-  .blue .value   { color: var(--blue); }
-  .blue .bar-fill { background: var(--blue); }
 </style>

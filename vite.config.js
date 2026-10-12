@@ -12,6 +12,12 @@ export default defineConfig(({ command, mode }) => {
   return {
     base: isDeployBuild ? '/ubuntu-mission-control/' : '/',
     plugins: [svelte(), ...(isDeployBuild ? [viteSingleFile()] : [])],
+    css: {
+      preprocessorOptions: {
+        // Vanilla still uses @import internally; hide its deprecations.
+        scss: { quietDeps: true },
+      },
+    },
     server: { port: 3000, proxy },
     preview: { port: 3000, proxy },
   }

@@ -1,4 +1,6 @@
 <script>
+  import SidePanel from './SidePanel.svelte'
+
   /**
    * @typedef {{
    *   id: string|number,
@@ -59,146 +61,52 @@
   }
 </script>
 
-{#if open}
-  <div class="backdrop" onclick={onClose} role="presentation"></div>
-{/if}
-
-<aside class="panel" class:open aria-label="Open Bugs" aria-hidden={!open}>
-  <div class="panel-header">
-    <span class="panel-title">Open Bugs</span>
-    <button class="close-btn" onclick={onClose} aria-label="Close bugs panel">
-      &#x2715;
-    </button>
-  </div>
-
-  <div class="panel-body">
-    {#if bugEntries.length === 0}
-      <div class="empty">No LP bugs referenced in test comments.</div>
-    {:else}
-      {#each bugEntries as { bugId, affectedProducts } (bugId)}
-        <div class="bug-row">
-          <div class="bug-ref">
-            <a
-              class="bug-link"
-              href="https://launchpad.net/bugs/{bugId}"
-              target="_blank"
-              rel="noopener noreferrer"
-            >LP #{bugId}</a>
-          </div>
-          <div class="bug-products">
-            {#each affectedProducts as p (p.id)}
-              <button
-                class="product-tag"
-                onclick={() => handleProductClick(p)}
-                title="Open {productLabel(p)}"
-              >{productLabel(p)}</button>
-            {/each}
-          </div>
+<SidePanel {open} title="Open bugs" width="25rem" {onClose}>
+  {#if bugEntries.length === 0}
+    <p class="u-text--muted empty">No LP bugs referenced in test comments.</p>
+  {:else}
+    {#each bugEntries as { bugId, affectedProducts } (bugId)}
+      <div class="bug-row">
+        <a
+          class="bug-link"
+          href="https://launchpad.net/bugs/{bugId}"
+          target="_blank"
+          rel="noopener noreferrer"
+        >LP #{bugId}</a>
+        <div class="bug-products">
+          {#each affectedProducts as p (p.id)}
+            <button
+              class="p-chip is-dense product-tag"
+              onclick={() => handleProductClick(p)}
+              title="Open {productLabel(p)}"
+            ><span class="p-chip__value">{productLabel(p)}</span></button>
+          {/each}
         </div>
-      {/each}
-    {/if}
-  </div>
-</aside>
+      </div>
+    {/each}
+  {/if}
+</SidePanel>
 
 <style>
-  .backdrop {
-    position: fixed;
-    inset: 0;
-    z-index: 199;
-    background: transparent;
-  }
-
-  .panel {
-    position: fixed;
-    top: 0;
-    right: 0;
-    bottom: 0;
-    width: 400px;
-    z-index: 200;
-    background: var(--bg-panel);
-    border-left: 1px solid var(--border-strong);
-    display: flex;
-    flex-direction: column;
-    transform: translateX(100%);
-    transition: transform 0.25s ease;
-    box-shadow: -4px 0 24px rgba(0, 0, 0, 0.35);
-  }
-
-  .panel.open {
-    transform: translateX(0);
-  }
-
-  /* ── Header ── */
-  .panel-header {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    padding: 0 1rem;
-    height: 60px;
-    border-bottom: 1px solid var(--border-mid);
-    flex-shrink: 0;
-  }
-
-  .panel-title {
-    font-size: 0.8rem;
-    font-weight: 700;
-    letter-spacing: 0.1em;
-    text-transform: uppercase;
-    color: var(--accent);
-    flex: 1;
-  }
-
-  .close-btn {
-    background: none;
-    border: none;
-    color: var(--text-muted);
-    font-size: 1rem;
-    cursor: pointer;
-    padding: 0.2rem 0.35rem;
-    line-height: 1;
-    border-radius: 3px;
-    transition: color 0.15s;
-    font-family: inherit;
-  }
-  .close-btn:hover { color: var(--text); }
-
-  /* ── Body ── */
-  .panel-body {
-    flex: 1;
-    overflow-y: auto;
-    padding: 0.25rem 0;
-  }
-
   .empty {
     padding: 2.5rem 1.5rem;
     text-align: center;
-    color: var(--text-dim);
-    font-size: 0.875rem;
-    line-height: 1.6;
   }
 
   /* ── Bug row ── */
   .bug-row {
+    border-bottom: 1px solid var(--vf-color-border-low-contrast);
     display: flex;
     flex-direction: column;
-    gap: 0.4rem;
+    gap: 0.5rem;
     padding: 0.75rem 1rem;
-    border-bottom: 1px solid var(--border-subtle);
-  }
-
-  .bug-ref {
-    display: flex;
-    align-items: center;
   }
 
   .bug-link {
-    font-size: 0.9rem;
-    font-weight: 600;
-    color: var(--accent);
-    text-decoration: none;
+    align-self: flex-start;
     font-variant-numeric: tabular-nums;
+    font-weight: 550;
   }
-  .bug-link:hover { text-decoration: underline; }
 
   .bug-products {
     display: flex;
@@ -206,32 +114,15 @@
     gap: 0.25rem;
   }
 
-  /* Clickable product tag - styled as a subtle button */
   .product-tag {
-    display: block;
-    width: 100%;
-    background: var(--bg-raised);
-    border: 1px solid var(--border-mid);
-    color: var(--text-muted);
-    font-size: 0.8rem;
-    font-family: inherit;
-    font-weight: 500;
-    padding: 0.3em 0.6em;
-    border-radius: 4px;
-    text-align: left;
-    cursor: pointer;
-    transition: background 0.1s, border-color 0.1s, color 0.1s;
-    white-space: nowrap;
+    justify-content: flex-start;
+    margin: 0;
+    max-width: 100%;
+  }
+
+  .product-tag .p-chip__value {
     overflow: hidden;
     text-overflow: ellipsis;
-  }
-  .product-tag:hover {
-    background: var(--surface-hover);
-    border-color: var(--accent);
-    color: var(--text-bright);
-  }
-  .product-tag:focus-visible {
-    outline: 2px solid var(--accent);
-    outline-offset: 1px;
+    white-space: nowrap;
   }
 </style>
