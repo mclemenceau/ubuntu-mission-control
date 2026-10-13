@@ -1,6 +1,14 @@
 <script>
   import { onMount } from 'svelte'
   import { fetchArtefact, fetchArtefactVersions, fetchBuilds, fetchTestResults } from '../api/client.js'
+  import {
+    countEffective,
+    execSlot,
+    latestExecutions,
+    recentRuns,
+    resolveResults,
+  } from '../lib/testResults.js'
+  import RunDots from './RunDots.svelte'
 
   /** @type {{ product: import('../lib/processor.js').Product, showCalendar?: boolean, onArtefactChange?: (a: any) => void }} */
   let { product, showCalendar = true, onArtefactChange = null } = $props()
@@ -24,46 +32,41 @@
   // ── Helpers shared by both load paths ─────────────────────────────────
   async function loadDayTestData(day, rawBuilds) {
     const execs = rawBuilds
-      .flatMap(b => b.test_executions ?? [])
+      .flatMap(b => (b.test_executions ?? []).map(e => ({ ...e, buildId: b.id })))
       .filter(te => te.test_plan !== 'Image build')
 
-    let passed     = execs.filter(e => e.status === 'PASSED').length
-    let failed     = execs.filter(e => ['FAILED', 'ENDED_PREMATURELY'].includes(e.status)).length
-    let inProgress = execs.filter(e => e.status === 'IN_PROGRESS').length
-    let notStarted = execs.filter(e => ['NOT_STARTED', 'NOT_TESTED'].includes(e.status)).length
+    // Re-runs are superseded by the newest attempt per build/env/plan.
+    const latest = latestExecutions(execs)
+    let passed     = latest.filter(e => e.status === 'PASSED').length
+    let failed     = latest.filter(e => ['FAILED', 'ENDED_PREMATURELY'].includes(e.status)).length
+    let notStarted = latest.filter(e => ['NOT_STARTED', 'NOT_TESTED'].includes(e.status)).length
 
-    const inProgressIds = new Set(execs.filter(e => e.status === 'IN_PROGRESS').map(e => e.id))
-    const execResults = new Map()
-    let resultPassed = 0, resultFailed = 0
-    const execsWithResults = new Set()
-    await Promise.all(
-      execs.map(async exec => {
-        const results = await fetchTestResults(exec.id).catch(() => [])
-        execResults.set(exec.id, results)
-        if (results.length > 0) {
-          if (inProgressIds.has(exec.id)) execsWithResults.add(exec.id)
-          for (const r of results) {
-            if (r.status === 'PASSED')      resultPassed++
-            else if (r.status === 'FAILED') resultFailed++
-          }
-        }
-      }),
+    const execResults = await Promise.all(
+      execs.map(async exec => ({
+        exec,
+        buildId: exec.buildId,
+        results: await fetchTestResults(exec.id).catch(() => []),
+      })),
     )
-    if (resultPassed + resultFailed > 0) {
-      passed     = resultPassed
-      failed     = resultFailed
-      inProgress = Math.max(0, inProgress - execsWithResults.size)
+    const counts = countEffective(resolveResults(execResults).effective)
+    if (counts.passed + counts.failed > 0) {
+      passed = counts.passed
+      failed = counts.failed
     }
-    // Suppress IN_PROGRESS with no results - not actionable signal.
-    inProgress = 0
+    // IN_PROGRESS executions are not actionable signal - not shown.
+    day.tests = { passed, failed, inProgress: 0, notStarted }
 
-    day.tests = { passed, failed, inProgress, notStarted }
+    const resultsById = new Map(execResults.map(x => [x.exec.id, x.results]))
     day.builds = rawBuilds
       .map(b => ({
         ...b,
         test_executions: (b.test_executions ?? [])
           .filter(te => te.test_plan !== 'Image build')
-          .map(exec => ({ ...exec, results: execResults.get(exec.id) ?? [] })),
+          .map(exec => ({
+            ...exec,
+            buildId: b.id,
+            results: resultsById.get(exec.id) ?? [],
+          })),
       }))
       .filter(b => b.test_executions.length > 0)
   }
@@ -230,17 +233,22 @@
 
   /**
    * Group all test executions from a set of builds by environment name,
-   * then flatten their results into a single row list per group.
+   * collapse re-runs to the latest attempt of each test, and flatten the
+   * effective results into a single row list per group.
    *
    * Each group: { envName, status, rows[], multiplePlans }
-   *   rows: { tester, testName, plan, status, comment }
+   *   rows: { tester, testName, plan, status, comment, runs, noResults }
+   *     runs: recent runs of the test for the RunDots strip
    *   multiplePlans: true when >1 distinct test_plan in the group
    *     (drives whether the "Test Plan" column is shown)
+   *
+   * A job (build, env, plan) whose latest attempt has no results and
+   * no earlier attempt with results gets a single "no results" row.
    *
    * Group status is the worst status across all executions:
    *   FAILED > IN_PROGRESS > NOT_STARTED > PASSED
    */
-  function groupExecsByEnv(builds) {
+  function groupExecsByEnv(builds, artefact) {
     const groups = new Map()
     for (const build of builds) {
       for (const exec of build.test_executions) {
@@ -257,20 +265,16 @@
       const plans = new Set(execs.map(e => e.test_plan).filter(Boolean))
       const multiplePlans = plans.size > 1
 
-      const rows = execs.flatMap(exec => {
-        const effStatus = effectiveExecStatus(exec)
-        const endedPrematurely = exec.status === 'ENDED_PREMATURELY'
-        if (exec.results.length === 0) {
-          return [{
-            tester: null,
-            testName: null,
-            plan: exec.test_plan ?? null,
-            status: effStatus,
-            comment: null,
-            noResults: true,
-          }]
-        }
-        return exec.results.map(r => {
+      const { effective } = resolveResults(
+        execs.map(exec => ({ exec, buildId: exec.buildId, results: exec.results })),
+      )
+      const slotsWithResults = new Set(
+        effective.map(e => execSlot(e.exec, e.buildId)),
+      )
+      const latest = latestExecutions(execs)
+
+      const rows = [
+        ...effective.map(({ exec, result: r }) => {
           const { tester, testName } = parseResultName(r.name)
           return {
             tester,
@@ -278,12 +282,24 @@
             plan: exec.test_plan ?? null,
             // If the execution was cut short, surface that on the row
             // rather than whatever partial result status was recorded.
-            status: endedPrematurely ? 'ENDED_PREMATURELY' : r.status,
+            status: exec.status === 'ENDED_PREMATURELY' ? 'ENDED_PREMATURELY' : r.status,
             comment: r.comment ?? null,
+            runs: recentRuns(r, artefact?.id, artefact?.version),
             noResults: false,
           }
-        })
-      })
+        }),
+        ...latest
+          .filter(exec => !slotsWithResults.has(execSlot(exec, exec.buildId)))
+          .map(exec => ({
+            tester: null,
+            testName: null,
+            plan: exec.test_plan ?? null,
+            status: effectiveExecStatus(exec),
+            comment: null,
+            runs: [],
+            noResults: true,
+          })),
+      ]
 
       // Group status derived from result rows where available,
       // falling back to exec-level status only when no results exist.
@@ -297,7 +313,7 @@
         else if (statuses.every(s => s === 'SKIPPED')) groupStatus = 'SKIPPED'
         else                                           groupStatus = 'IN_PROGRESS'
       } else {
-        groupStatus = execs.reduce((worst, exec) => {
+        groupStatus = latest.reduce((worst, exec) => {
           const s = effectiveExecStatus(exec)
           return (STATUS_RANK[s] ?? 99) < (STATUS_RANK[worst] ?? 99) ? s : worst
         }, 'PASSED')
@@ -491,7 +507,7 @@
       {#if !selDay.builds || selDay.builds.length === 0}
         <div class="detail-empty">No test executions for this build.</div>
       {:else}
-        {#each groupExecsByEnv(selDay.builds) as group}
+        {#each groupExecsByEnv(selDay.builds, selDay.artefact) as group}
           <div class="det-env-group">
             <div class="det-env-hdr">
               <span>{group.envName}</span>
@@ -510,6 +526,7 @@
                     <th>Tester</th>
                     <th>Test</th>
                     <th>Status</th>
+                    <th>Recent runs</th>
                     <th>Comment</th>
                   </tr>
                 </thead>
@@ -518,7 +535,7 @@
                     {#if r.noResults}
                       <tr class="res-other">
                         {#if group.multiplePlans}<td class="det-plan-col">{r.plan ?? '—'}</td>{/if}
-                        <td colspan="4" class="det-no-results-inline">No results submitted yet.</td>
+                        <td colspan="5" class="det-no-results-inline">No results submitted yet.</td>
                       </tr>
                     {:else}
                       <tr class={resultStatusClass(r.status)}>
@@ -530,6 +547,7 @@
                             {r.status ?? '—'}
                           </span>
                         </td>
+                        <td class="det-runs"><RunDots runs={r.runs} /></td>
                         <td class="det-comment">{r.comment ?? ''}</td>
                       </tr>
                     {/if}
@@ -811,5 +829,6 @@
   .res-fail td { background: var(--vf-color-background-negative-default); }
 
   .det-tester  { color: var(--vf-color-text-muted); white-space: nowrap; }
+  .det-runs { white-space: nowrap; }
   .det-comment { color: var(--vf-color-text-muted); font-style: italic; }
 </style>
