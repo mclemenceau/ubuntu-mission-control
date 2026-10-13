@@ -284,7 +284,7 @@
             // rather than whatever partial result status was recorded.
             status: exec.status === 'ENDED_PREMATURELY' ? 'ENDED_PREMATURELY' : r.status,
             comment: r.comment ?? null,
-            runs: recentRuns(r, artefact?.id, artefact?.version),
+            runs: recentRuns(r, artefact?.version),
             noResults: false,
           }
         }),

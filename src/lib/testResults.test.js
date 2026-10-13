@@ -142,7 +142,7 @@ describe('latestExecutions', () => {
 })
 
 describe('recentRuns', () => {
-  it('lists previous runs oldest first and flags same-artifact reruns', () => {
+  it('lists previous runs oldest first, ending with the current result', () => {
     const r = result(36832, 'snap', 'PASSED', '2026-10-12T19:50', {
       previous_results: [
         { status: 'FAILED', version: '20261012', artefact_id: 34761 },
@@ -153,18 +153,18 @@ describe('recentRuns', () => {
       ],
     })
 
-    expect(recentRuns(r, 34761, '20261012')).toEqual([
-      { status: 'PASSED', version: '20261005', rerun: false, current: false },
-      { status: 'PASSED', version: '20261005', rerun: false, current: false },
-      { status: 'PASSED', version: '20261007', rerun: false, current: false },
-      { status: 'FAILED', version: '20261012', rerun: true,  current: false },
-      { status: 'PASSED', version: '20261012', rerun: false, current: true  },
+    expect(recentRuns(r, '20261012')).toEqual([
+      { status: 'PASSED', version: '20261005' },
+      { status: 'PASSED', version: '20261005' },
+      { status: 'PASSED', version: '20261007' },
+      { status: 'FAILED', version: '20261012' },
+      { status: 'PASSED', version: '20261012' },
     ])
   })
 
   it('returns just the current run without history', () => {
-    expect(recentRuns(result(1, 'a', 'FAILED', ''), 1, 'v')).toEqual([
-      { status: 'FAILED', version: 'v', rerun: false, current: true },
+    expect(recentRuns(result(1, 'a', 'FAILED', ''), 'v')).toEqual([
+      { status: 'FAILED', version: 'v' },
     ])
   })
 })

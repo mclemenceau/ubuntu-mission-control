@@ -126,20 +126,12 @@ export function countEffective(effective) {
  * Recent runs of a test, oldest first, ending with the given result.
  * Uses Test Observer's previous_results (newest first), which covers both
  * reruns on this artifact and earlier versions.
- * Each run: { status, version, rerun, current }
+ * Each run: { status, version }
  */
-export function recentRuns(result, artefactId, version, limit = 5) {
+export function recentRuns(result, version, limit = 5) {
   const previous = (result.previous_results ?? [])
     .slice(0, limit - 1)
     .reverse()
-    .map(p => ({
-      status: p.status,
-      version: p.version,
-      rerun: p.artefact_id === artefactId,
-      current: false,
-    }))
-  return [
-    ...previous,
-    { status: result.status, version, rerun: false, current: true },
-  ]
+    .map(p => ({ status: p.status, version: p.version }))
+  return [...previous, { status: result.status, version }]
 }
