@@ -50,15 +50,17 @@ describe('processor', () => {
       tests: { passed: 0, failed: 0, inProgress: 0, notStarted: 0 },
     }
 
+    const env = id => ({ id, name: `env-${id}` })
     fetchBuilds.mockResolvedValue([
       {
+        id: 100,
         test_executions: [
-          { id: 11, test_plan: 'Manual Testing', status: 'PASSED' },
-          { id: 12, test_plan: 'Manual Testing', status: 'FAILED' },
-          { id: 13, test_plan: 'Manual Testing', status: 'IN_PROGRESS' },
-          { id: 14, test_plan: 'Manual Testing', status: 'NOT_STARTED' },
-          { id: 15, test_plan: 'Image build', status: 'PASSED' },
-          { id: 16, test_plan: 'Jenkins image validation', status: 'PASSED' },
+          { id: 11, test_plan: 'Manual Testing', environment: env(1), status: 'PASSED' },
+          { id: 12, test_plan: 'Manual Testing', environment: env(2), status: 'FAILED' },
+          { id: 13, test_plan: 'Manual Testing', environment: env(3), status: 'IN_PROGRESS' },
+          { id: 14, test_plan: 'Manual Testing', environment: env(4), status: 'NOT_STARTED' },
+          { id: 15, test_plan: 'Image build', environment: env(5), status: 'PASSED' },
+          { id: 16, test_plan: 'Jenkins image validation', environment: env(5), status: 'PASSED' },
         ],
       },
     ])
@@ -67,32 +69,56 @@ describe('processor', () => {
 
     expect(item.execIds).toEqual([11, 12, 13, 14, 16])
     expect(item.tests).toEqual({ passed: 2, failed: 1, inProgress: 1, notStarted: 1 })
-    expect(item._inProgressExecIds).toEqual(new Set([13]))
+  })
+
+  it('counts only the latest execution of a re-run job', async () => {
+    const item = { id: 1, execIds: [], tests: {} }
+    const env = { id: 7740, name: 'jenkins' }
+    fetchBuilds.mockResolvedValue([
+      {
+        id: 100,
+        test_executions: [
+          { id: 21, test_plan: 'ISO Smoke snap', environment: env,
+            status: 'FAILED', created_at: '2026-04-12T10:00' },
+          { id: 22, test_plan: 'ISO Smoke snap', environment: env,
+            status: 'PASSED', created_at: '2026-04-12T19:00' },
+        ],
+      },
+    ])
+
+    await enrichWithTestExecutions([item])
+
+    // Both attempts are kept for bug extraction, only the latest counts.
+    expect(item.execIds).toEqual([21, 22])
+    expect(item.tests).toEqual({ passed: 1, failed: 0, inProgress: 0, notStarted: 0 })
   })
 
   it('enriches items with bug extraction and result-based test counts', async () => {
+    const env = { id: 1, name: 'jenkins' }
     const item = {
       id: 1,
       execIds: [16, 21],
+      execs: new Map([
+        [16, { id: 16, buildId: 100, test_plan: 'Smoke', environment: env }],
+        [21, { id: 21, buildId: 100, test_plan: 'Manual Testing', environment: env }],
+      ]),
       tests: { passed: 1, failed: 0, inProgress: 1, notStarted: 0 },
       bugs: [],
-      _resultPassed: 0,
-      _resultFailed: 0,
-      _execsWithResults: new Set(),
-      _inProgressExecIds: new Set([21]),
     }
 
     fetchTestResults.mockImplementation(execId =>
       Promise.resolve(
         execId === 16
-          ? [{ status: 'PASSED', comment: '', issues: [] }]
+          ? [{ name: 'default', status: 'PASSED', comment: '', issues: [] }]
           : [
               {
+                name: 'alice - install',
                 status: 'PASSED',
                 comment: 'Investigated LP: #123456',
                 issues: [{ issue: { source: 'launchpad', key: '999999' } }],
               },
               {
+                name: 'alice - upgrade',
                 status: 'FAILED',
                 comment: 'See bugs.launchpad.net/foo/+bug/234567',
                 issues: [],
@@ -104,12 +130,42 @@ describe('processor', () => {
     const bugCount = await enrichWithBugs([item])
 
     expect(bugCount).toBe(3)
-    expect(item.tests).toEqual({ passed: 2, failed: 1, inProgress: 0, notStarted: 0 })
+    expect(item.tests).toEqual({
+      passed: 2, failed: 1, inProgress: 0, notStarted: 0, recovered: 0,
+    })
     expect(item.bugs.sort()).toEqual(['123456', '234567', '999999'])
-    expect(item).not.toHaveProperty('_resultPassed')
-    expect(item).not.toHaveProperty('_resultFailed')
-    expect(item).not.toHaveProperty('_execsWithResults')
-    expect(item).not.toHaveProperty('_inProgressExecIds')
+  })
+
+  it('counts the latest attempt of re-run results but keeps their bugs', async () => {
+    const env = { id: 1, name: 'jenkins' }
+    const item = {
+      id: 1,
+      execIds: [31, 32],
+      execs: new Map([
+        [31, { id: 31, buildId: 100, test_plan: 'Smoke', environment: env }],
+        [32, { id: 32, buildId: 100, test_plan: 'Smoke', environment: env }],
+      ]),
+      tests: { passed: 0, failed: 0, inProgress: 0, notStarted: 0 },
+      bugs: [],
+    }
+
+    fetchTestResults.mockImplementation(execId =>
+      Promise.resolve(
+        execId === 31
+          ? [{ id: 1, name: 'snap', status: 'FAILED', created_at: '2026-04-12T10:00',
+               comment: 'LP: #2100001', issues: [] }]
+          : [{ id: 2, name: 'snap', status: 'PASSED', created_at: '2026-04-12T19:00',
+               comment: '', issues: [] }],
+      ),
+    )
+
+    const bugCount = await enrichWithBugs([item])
+
+    expect(bugCount).toBe(1)
+    expect(item.bugs).toEqual(['2100001'])
+    expect(item.tests).toEqual({
+      passed: 1, failed: 0, inProgress: 0, notStarted: 0, recovered: 1,
+    })
   })
 
   it('computes KPIs from current product state', () => {

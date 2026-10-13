@@ -1,15 +1,11 @@
 import { fetchArtefacts, fetchArtefactVersions, fetchBuilds, fetchTestResults } from '../api/client.js'
 import { artifactTypeLabel, fmtDate } from './utils.js'
-
-function parseTester(name) {
-  const idx = (name || '').indexOf(' - ')
-  return idx > 0 ? name.slice(0, idx).trim() : (name || '').trim()
-}
-
-function parseTestCase(name) {
-  const idx = (name || '').indexOf(' - ')
-  return idx > 0 ? name.slice(idx + 3).trim() : ''
-}
+import {
+  extractBugs,
+  parseTester,
+  parseTestCase,
+  resolveResults,
+} from './testResults.js'
 
 function versionToDate(version) {
   const base = (version ?? '').slice(0, 8)
@@ -17,25 +13,10 @@ function versionToDate(version) {
   return `${base.slice(0, 4)}-${base.slice(4, 6)}-${base.slice(6, 8)}`
 }
 
-function extractBugs(result) {
-  const bugs = new Set()
-  for (const { issue } of result.issues ?? []) {
-    if (issue?.source === 'launchpad' && issue?.key) bugs.add(issue.key)
-  }
-  const comment = result.comment ?? ''
-  for (const pat of [
-    /bugs\.launchpad\.net\/[^\s)]+\/\+bug\/(\d+)/gi,
-    /\bbug\s*#?(\d{5,7})\b/gi,
-    /\bLP[:\s]+#?(\d{5,7})\b/gi,
-  ]) {
-    for (const m of comment.matchAll(pat)) bugs.add(m[1])
-  }
-  return [...bugs]
-}
-
 /**
  * 4-phase pipeline building a flat list of individual test result entries
- * for the given release and date range.
+ * for the given release and date range. Re-run attempts are collapsed so
+ * each entry is the latest result of one test on one artifact version.
  * onProgress({ label, pct }) is called throughout.
  */
 export async function buildTestingDataset({ release, dateFrom, dateTo }, onProgress) {
@@ -97,9 +78,8 @@ export async function buildTestingDataset({ release, dateFrom, dateTo }, onProgr
             execQueue.push({
               art, version, date,
               arch: build.architecture || '',
-              execId: exec.id,
-              execStatus: exec.status,
-              testPlan: exec.test_plan,
+              buildId: build.id,
+              exec,
             })
           }
         }
@@ -108,39 +88,52 @@ export async function buildTestingDataset({ release, dateFrom, dateTo }, onProgr
     onProgress?.({ label: 'Fetching builds…', pct: 25 + Math.round((++done / (buildPairs.length || 1)) * 25) })
   }))
 
-  // Phase 4 — fetch individual test results for each execution
+  // Phase 4 — fetch individual test results for each execution, then
+  // resolve re-runs per artifact version so only the latest attempt of
+  // each test is reported.
   done = 0
-  const entries = []
-  await Promise.all(execQueue.map(async ({ art, version, date, arch, execId, execStatus, testPlan }) => {
+  const byVersion = new Map()   // artefact_id → [{ ctx, exec, buildId, results }]
+  await Promise.all(execQueue.map(async ctx => {
     try {
-      const results = await fetchTestResults(execId)
-      const manual = testPlan === 'Manual Testing'
-      for (const r of results) {
-        entries.push({
-          date,
-          artefactId:  version.artefact_id,
-          artefactName: art.name,
-          displayName:  art.os || artifactTypeLabel(art.name, art.release),
-          release:      art.release,
-          os:           art.os || '',
-          version:      version.version,
-          arch,
-          type:         artifactTypeLabel(art.name, art.release),
-          execId,
-          execStatus,
-          testPlan,
-          manual,
-          resultId:  r.id,
-          status:    r.status,   // PASSED | FAILED | SKIPPED
-          tester:    parseTester(r.name),
-          testCase:  parseTestCase(r.name),
-          comment:   r.comment ?? '',
-          bugs:      extractBugs(r),
-        })
-      }
+      const results = await fetchTestResults(ctx.exec.id)
+      const key = ctx.version.artefact_id
+      if (!byVersion.has(key)) byVersion.set(key, [])
+      byVersion.get(key).push({ ctx, exec: ctx.exec, buildId: ctx.buildId, results })
     } catch { /* skip */ }
     onProgress?.({ label: 'Loading test results…', pct: 50 + Math.round((++done / (execQueue.length || 1)) * 48) })
   }))
+
+  const entries = []
+  for (const execResults of byVersion.values()) {
+    const ctxByExec = new Map(execResults.map(x => [x.exec.id, x.ctx]))
+    const { effective } = resolveResults(execResults)
+    for (const { exec, result: r, attempts, recovered } of effective) {
+      const { art, version, date, arch } = ctxByExec.get(exec.id)
+      entries.push({
+        date,
+        artefactId:  version.artefact_id,
+        artefactName: art.name,
+        displayName:  art.os || artifactTypeLabel(art.name, art.release),
+        release:      art.release,
+        os:           art.os || '',
+        version:      version.version,
+        arch,
+        type:         artifactTypeLabel(art.name, art.release),
+        execId:       exec.id,
+        execStatus:   exec.status,
+        testPlan:     exec.test_plan,
+        manual:       exec.test_plan === 'Manual Testing',
+        resultId:  r.id,
+        status:    r.status,   // PASSED | FAILED | SKIPPED
+        tester:    parseTester(r.name),
+        testCase:  parseTestCase(r.name),
+        comment:   r.comment ?? '',
+        bugs:      extractBugs(r),
+        attempts,
+        recovered,
+      })
+    }
+  }
 
   return entries
 }
@@ -155,7 +148,11 @@ export function computeTestingKpis(entries) {
   const testers  = new Set(entries.map(e => e.tester).filter(Boolean)).size
   const executions = new Set(entries.map(e => e.execId)).size
   const artifacts  = new Set(entries.map(e => e.artefactId)).size
-  return { total, passed, failed, passRate, bugs, testers, executions, artifacts }
+  const recovered  = entries.filter(e => e.recovered).length
+  return {
+    total, passed, failed, passRate, bugs, testers, executions, artifacts,
+    recovered,
+  }
 }
 
 function dayISO(d) {

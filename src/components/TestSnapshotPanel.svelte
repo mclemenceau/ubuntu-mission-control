@@ -92,6 +92,14 @@
           <span class="p-chip--negative is-dense is-readonly">
             <span class="p-chip__value">{snapshot.summary.failed} failed</span>
           </span>
+          {#if snapshot.summary.recovered > 0}
+            <span class="p-chip--caution is-dense is-readonly"
+                  title="Failed on an earlier attempt, passed on rerun">
+              <span class="p-chip__value">
+                {snapshot.summary.recovered} recovered on rerun
+              </span>
+            </span>
+          {/if}
           {#if snapshot.summary.passRate !== null}
             <span class="p-chip--{pctColor(snapshot.summary.passRate)} is-dense is-readonly">
               <span class="p-chip__value">

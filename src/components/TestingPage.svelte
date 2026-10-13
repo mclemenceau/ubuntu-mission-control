@@ -269,6 +269,13 @@
         tone={kpis.failed > 0 ? 'negative' : 'neutral'}
       />
       <KpiCard
+        label="Recovered on rerun"
+        value={kpis.recovered}
+        sub="failed, then passed"
+        pct={null}
+        tone={kpis.recovered > 0 ? 'caution' : 'neutral'}
+      />
+      <KpiCard
         label="Bugs filed"
         value={kpis.bugs}
         sub="unique LP bugs"
@@ -525,7 +532,7 @@
   .kpi-strip {
     display: grid;
     flex-shrink: 0;
-    grid-template-columns: repeat(5, 1fr);
+    grid-template-columns: repeat(6, 1fr);
     padding: 0;
   }
 

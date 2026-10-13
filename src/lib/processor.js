@@ -1,5 +1,13 @@
 import { todayStr, artifactTypeLabel, versionAgeDays, extractArch } from './utils.js'
 import { fetchBuilds, fetchTestResults } from '../api/client.js'
+import {
+  extractBugs,
+  latestExecutions,
+  resolveResults,
+  countEffective,
+  parseTester,
+  parseTestCase,
+} from './testResults.js'
 
 /**
  * Phase 1 — Filter today's artifacts and build the initial product list.
@@ -25,16 +33,13 @@ export function buildProductItems(artefacts, milestone) {
       tests:       { passed: 0, failed: 0, inProgress: 0, notStarted: 0 },
       bugs:        [],
       execIds:     [],
-      // Temporary accumulators populated in Phase 3 from individual test results.
-      // Overwrite the coarser execution-level counts once real results are available.
-      _resultPassed: 0,
-      _resultFailed: 0,
-      _execsWithResults: new Set(),
     }))
 }
 
 /**
  * Phase 2 — Enrich items in-place with test execution counts.
+ * Re-run executions are superseded by the newest attempt per
+ * (build, environment, test plan) and do not count.
  * Calls onProgress(done, total) after each item completes.
  */
 export async function enrichWithTestExecutions(items, onProgress) {
@@ -43,17 +48,19 @@ export async function enrichWithTestExecutions(items, onProgress) {
     items.map(async item => {
       const builds = await fetchBuilds(item.id).catch(() => [])
       const execs = builds
-        .flatMap(b => b.test_executions ?? [])
+        .flatMap(b => (b.test_executions ?? []).map(e => ({ ...e, buildId: b.id })))
         .filter(te => te.test_plan !== 'Image build')
 
+      // Every attempt is kept so bugs filed against superseded runs are found.
       item.execIds = execs.map(e => e.id)
-      item.execPlans = new Map(execs.map(e => [e.id, e.test_plan]))
-      item._inProgressExecIds = new Set(execs.filter(e => e.status === 'IN_PROGRESS').map(e => e.id))
+      item.execs = new Map(execs.map(e => [e.id, e]))
+
+      const latest = latestExecutions(execs)
       item.tests = {
-        passed:     execs.filter(e => e.status === 'PASSED').length,
-        failed:     execs.filter(e => ['FAILED', 'ENDED_PREMATURELY'].includes(e.status)).length,
-        inProgress: execs.filter(e => e.status === 'IN_PROGRESS').length,
-        notStarted: execs.filter(e => ['NOT_STARTED', 'NOT_TESTED'].includes(e.status)).length,
+        passed:     latest.filter(e => e.status === 'PASSED').length,
+        failed:     latest.filter(e => ['FAILED', 'ENDED_PREMATURELY'].includes(e.status)).length,
+        inProgress: latest.filter(e => e.status === 'IN_PROGRESS').length,
+        notStarted: latest.filter(e => ['NOT_STARTED', 'NOT_TESTED'].includes(e.status)).length,
       }
       onProgress?.(++done, items.length)
     }),
@@ -61,84 +68,52 @@ export async function enrichWithTestExecutions(items, onProgress) {
 }
 
 /**
- * Phase 3 — Enrich items in-place with LP bugs from test result comments.
- * Deduplicates execution IDs across items to avoid redundant API calls.
+ * Fetch results for every execution of a product and resolve re-runs.
+ * Results are cached for the session, so callers can repeat this freely.
+ */
+async function loadResolvedResults(item) {
+  const execResults = await Promise.all(
+    (item.execIds ?? []).map(async execId => {
+      const exec = item.execs?.get(execId) ?? { id: execId }
+      const results = await fetchTestResults(execId).catch(() => [])
+      return { exec, buildId: exec.buildId, results }
+    }),
+  )
+  const all = execResults.flatMap(({ results }) => results)
+  return { ...resolveResults(execResults), all }
+}
+
+/**
+ * Phase 3 — Enrich items in-place with LP bugs from test result comments,
+ * and replace execution-level counts with counts of effective results
+ * (the latest attempt of each test). Bugs are collected from every
+ * attempt: a bug filed against a failed run stays real after a rerun.
  * Returns the total unique bug count.
  */
 export async function enrichWithBugs(items, onProgress) {
-  // Build a deduplicated list of (item, execId) pairs
-  const seen = new Set()
-  const queue = []
-  for (const item of items) {
-    for (const execId of item.execIds) {
-      if (!seen.has(execId)) {
-        seen.add(execId)
-        queue.push({ item, execId })
-      }
-    }
-  }
-
   const globalBugs = new Set()
   let done = 0
+  const total = items.length
 
   await Promise.all(
-    queue.map(async ({ item, execId }) => {
-      const results = await fetchTestResults(execId).catch(() => [])
-      const itemBugs = new Set()
+    items.map(async item => {
+      const { effective, all } = await loadResolvedResults(item)
 
-      for (const r of results) {
-        // Tally individual test result statuses (more accurate than execution-level status)
-        if (r.status === 'PASSED') item._resultPassed++
-        else if (r.status === 'FAILED') item._resultFailed++
-
-        // Structured API issues
-        for (const { issue } of r.issues ?? []) {
-          if (issue?.source === 'launchpad' && issue?.key) {
-            globalBugs.add(issue.key)
-            itemBugs.add(issue.key)
-          }
-        }
-        // Freeform comment patterns
-        const comment = r.comment ?? ''
-        for (const pat of [
-          /bugs\.launchpad\.net\/[^\s)]+\/\+bug\/(\d+)/gi,
-          /\bbug\s*#?(\d{5,7})\b/gi,
-          /\bLP[:\s]+#?(\d{5,7})\b/gi,
-        ]) {
-          for (const m of comment.matchAll(pat)) {
-            globalBugs.add(m[1])
-            itemBugs.add(m[1])
-          }
-        }
-
-        if (results.length > 0 && item._inProgressExecIds?.has(execId)) item._execsWithResults.add(execId)
-      }
-
+      const itemBugs = new Set(all.flatMap(extractBugs))
+      itemBugs.forEach(b => globalBugs.add(b))
       item.bugs = [...itemBugs]
-      onProgress?.(++done, queue.length)
+
+      const { passed, failed, recovered } = countEffective(effective)
+      if (passed + failed > 0) {
+        item.tests.passed = passed
+        item.tests.failed = failed
+      }
+      item.tests.recovered = recovered
+      // IN_PROGRESS executions are not actionable - only PASSED/FAILED matter.
+      item.tests.inProgress = 0
+      onProgress?.(++done, total)
     }),
   )
-
-  // Replace Phase 2 execution-level counts with actual submitted test results.
-  // An execution that is IN_PROGRESS but has results is no longer "pending" —
-  // it has real data. An execution with no results at all stays in inProgress.
-  for (const item of items) {
-    if (item._resultPassed + item._resultFailed > 0) {
-      item.tests.passed = item._resultPassed
-      item.tests.failed = item._resultFailed
-      item.tests.inProgress = Math.max(
-        0,
-        item.tests.inProgress - item._execsWithResults.size,
-      )
-    }
-    // IN_PROGRESS executions with no results are not actionable -
-    // suppress them; only PASSED/FAILED matter.
-    item.tests.inProgress = 0
-    delete item._resultPassed
-    delete item._resultFailed
-    delete item._execsWithResults
-    delete item._inProgressExecIds
-  }
 
   return globalBugs.size
 }
@@ -221,50 +196,44 @@ export function diffProducts(current, next) {
 
 // ── Test snapshot helpers ─────────────────────────────────────────────────
 
-function parseTester(name) {
-  const idx = (name || '').indexOf(' - ')
-  return idx > 0 ? name.slice(0, idx).trim() : (name || '').trim()
-}
-
-function parseTestCase(name) {
-  const idx = (name || '').indexOf(' - ')
-  return idx > 0 ? name.slice(idx + 3).trim() : (name || '').trim()
-}
-
 /**
  * Re-reads cached test results for all current products and aggregates them
  * into a snapshot matching exactly what the Test Executions KPI shows.
+ * Only the latest attempt of each test counts; earlier attempts are
+ * reported as reruns, and still contribute their bugs.
  *
  * Returns:
- *   summary    - { total, passed, failed, inProgress, passRate }
- *   byArtifact - [{ displayName, arch, passed, failed, inProgress, bugs,
- *                   passRate }] sorted by failures desc
+ *   summary    - { total, passed, failed, passRate, recovered, reruns }
+ *   byArtifact - [{ displayName, arch, passed, failed, bugs, passRate }]
+ *                sorted by pass rate asc
  *   byTester   - [{ tester, passed, failed, bugs, passRate }] sorted by
  *                total desc
  *   failures   - [{ displayName, arch, testCase, tester, comment }]
  */
 export async function buildCurrentTestSnapshot(products) {
-  // Deduplicate execIds across products
-  const seen = new Set()
-  const queue = []
-  for (const p of products) {
-    for (const execId of p.execIds ?? []) {
-      if (!seen.has(execId)) {
-        seen.add(execId)
-        const testPlan = p.execPlans?.get(execId) ?? ''
-        queue.push({ product: p, execId, testPlan })
-      }
-    }
-  }
-
   const artMap     = new Map()   // key: `${displayName}|${arch}`
   const testerMap  = new Map()   // key: testerName
   const failures   = []
+  let recovered = 0
+  let reruns    = 0
 
-  await Promise.all(queue.map(async ({ product, execId, testPlan }) => {
-    const results = await fetchTestResults(execId).catch(() => [])
-    const artKey  = `${product.displayName}|${product.arch}`
-    const manual  = testPlan === 'Manual Testing'
+  function testerRow(tester) {
+    if (!testerMap.has(tester)) {
+      testerMap.set(tester, {
+        tester,
+        passed: 0,
+        failed: 0,
+        manualTotal: 0,
+        automatedTotal: 0,
+        bugs: new Set(),
+      })
+    }
+    return testerMap.get(tester)
+  }
+
+  await Promise.all(products.map(async product => {
+    const { effective, superseded } = await loadResolvedResults(product)
+    const artKey = `${product.displayName}|${product.arch}`
 
     if (!artMap.has(artKey)) {
       artMap.set(artKey, {
@@ -272,27 +241,15 @@ export async function buildCurrentTestSnapshot(products) {
         arch:        product.arch,
         passed:      0,
         failed:      0,
-        inProgress:  0,
         bugs:        new Set(),
       })
     }
     const art = artMap.get(artKey)
+    reruns += superseded.length
 
-    for (const r of results) {
-      const tester   = parseTester(r.name)
-      const testCase = parseTestCase(r.name)
-
-      if (!testerMap.has(tester)) {
-        testerMap.set(tester, {
-          tester,
-          passed: 0,
-          failed: 0,
-          manualTotal: 0,
-          automatedTotal: 0,
-          bugs: new Set(),
-        })
-      }
-      const t = testerMap.get(tester)
+    for (const { exec, result: r, recovered: rec } of effective) {
+      const tester = parseTester(r.name)
+      const t = testerRow(tester)
 
       if (r.status === 'PASSED') {
         art.passed++
@@ -303,28 +260,19 @@ export async function buildCurrentTestSnapshot(products) {
         failures.push({
           displayName: product.displayName,
           arch:        product.arch,
-          testCase,
+          testCase:    parseTestCase(r.name),
           tester,
           comment: r.comment ?? '',
         })
       }
-      if (manual) t.manualTotal++
+      if (rec) recovered++
+      if (exec.test_plan === 'Manual Testing') t.manualTotal++
       else t.automatedTotal++
+    }
 
-      // Collect bugs from structured issues and freeform comments
-      const rawBugs = new Set()
-      for (const { issue } of r.issues ?? []) {
-        if (issue?.source === 'launchpad' && issue?.key) rawBugs.add(issue.key)
-      }
-      const comment = r.comment ?? ''
-      for (const pat of [
-        /bugs\.launchpad\.net\/[^\s)]+\/\+bug\/(\d+)/gi,
-        /\bbug\s*#?(\d{5,7})\b/gi,
-        /\bLP[:\s]+#?(\d{5,7})\b/gi,
-      ]) {
-        for (const m of comment.matchAll(pat)) rawBugs.add(m[1])
-      }
-      rawBugs.forEach(b => { art.bugs.add(b); t.bugs.add(b) })
+    for (const { result: r } of [...effective, ...superseded]) {
+      const t = testerRow(parseTester(r.name))
+      extractBugs(r).forEach(b => { art.bugs.add(b); t.bugs.add(b) })
     }
   }))
 
@@ -365,6 +313,8 @@ export async function buildCurrentTestSnapshot(products) {
     passRate:  (totalPassed + totalFailed) > 0
       ? Math.round((totalPassed / (totalPassed + totalFailed)) * 100)
       : null,
+    recovered,
+    reruns,
   }
 
   return { summary, byArtifact, byTester, failures }
