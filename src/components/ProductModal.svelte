@@ -42,15 +42,15 @@
   })
 
   const STATUS_LABELS = {
-    APPROVED:         '✓ Approved',
-    MARKED_AS_FAILED: '✗ Failed',
-    UNDECIDED:        '? Undecided',
+    APPROVED:         'Approved',
+    MARKED_AS_FAILED: 'Failed',
+    UNDECIDED:        'Undecided',
   }
 
-  // Only APPROVED and MARKED_AS_FAILED colour the header; everything else is neutral.
-  let cardClass = $derived(
-    product.status === 'APPROVED'           ? 'approved'
-    : product.status === 'MARKED_AS_FAILED' ? 'failed'
+  // Only APPROVED and MARKED_AS_FAILED get a tone; everything else is neutral.
+  let tone = $derived(
+    product.status === 'APPROVED'           ? 'positive'
+    : product.status === 'MARKED_AS_FAILED' ? 'negative'
     : 'neutral'
   )
 
@@ -87,95 +87,119 @@
 <svelte:window onkeydown={onKeydown} />
 
 <!-- svelte-ignore a11y_click_events_have_key_events -->
-<div class="backdrop" onclick={onBackdropClick} role="presentation">
-  <div class="modal" role="dialog" aria-modal="true">
+<div class="p-modal" onclick={onBackdropClick} role="presentation">
+  <section
+    class="p-modal__dialog product-modal tone-{tone}"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="product-modal-title"
+  >
 
     <!-- ── Header ─────────────────────────────────────────────── -->
-    <div class="modal-header {cardClass}">
+    <header class="p-modal__header">
       <div class="header-left">
         <img class="header-flavor-icon" src={flavorIcon} alt="" aria-hidden="true" />
         <div class="header-left-text">
-          <div class="modal-name">
-            {#if product.displayName}<span class="os-tag">{product.displayName}</span>{/if}
-            <span title={product.name}>{product.name}</span>
-            <a class="ext-link"
-               href="https://tests.ubuntu.com/#/images/{product.id}"
+          <h2 class="p-modal__title modal-name" id="product-modal-title">
+            {#if product.displayName}
+              <span class="os-tag">{product.displayName}</span>
+            {/if}
+            <span class="u-truncate" title={product.name}>{product.name}</span>
+            <a href="https://tests.ubuntu.com/#/images/{product.id}"
                target="_blank"
                rel="noopener noreferrer"
-               title="Open on tests.ubuntu.com">↗</a>
-          </div>
-          <div class="modal-sub">
+               title="Open on tests.ubuntu.com"
+            ><i class="p-icon--external-link">Open on tests.ubuntu.com</i></a>
+          </h2>
+          <div class="modal-sub u-text--muted">
             {product.type}{product.arch ? ` · ${product.arch}` : ''}
-            {#if product.mandatory}<span class="mandatory-tag">★ mandatory</span>{/if}
+            {#if product.mandatory}
+              <span class="p-chip is-dense is-readonly">
+                <span class="p-chip__value">★ Mandatory</span>
+              </span>
+            {/if}
           </div>
         </div>
       </div>
       <div class="header-right">
-        <span class="hbadge {cardClass}">{STATUS_LABELS[product.status] ?? '—'}</span>
+        {#if tone === 'neutral'}
+          <span class="p-status-label">{STATUS_LABELS[product.status] ?? '—'}</span>
+        {:else}
+          <span class="p-status-label--{tone}">{STATUS_LABELS[product.status]}</span>
+        {/if}
         {#if product.ageDays !== null}
-          <span class="age-chip">
+          <span class="u-text--muted">
             {product.ageDays === 0 ? 'built today' : `${product.ageDays}d old`}
           </span>
         {/if}
-        <button class="close-btn" onclick={onclose} aria-label="Close">✕</button>
       </div>
-    </div>
+      <button class="p-modal__close" onclick={onclose} aria-label="Close">Close</button>
+    </header>
 
-    <!-- ── View toggle nav ───────────────────────────────────────── -->
-    <div class="view-nav">
-      <button class="vnav-btn" class:active={!showHistory} onclick={() => showHistory = false}>
-        Latest Build
-      </button>
-      <span class="vnav-sep">|</span>
-      <button class="vnav-btn" class:active={showHistory} onclick={() => showHistory = true}>
-        Show 30 Days History
-      </button>
+    <!-- ── View toggle ───────────────────────────────────────────── -->
+    <div class="p-segmented-control is-dense view-nav">
+      <div class="p-segmented-control__list" role="tablist" aria-label="View">
+        <button
+          class="p-segmented-control__button"
+          role="tab"
+          aria-selected={!showHistory}
+          onclick={() => showHistory = false}
+        >Latest build</button>
+        <button
+          class="p-segmented-control__button"
+          role="tab"
+          aria-selected={showHistory}
+          onclick={() => showHistory = true}
+        >30-day history</button>
+      </div>
     </div>
 
     <!-- ── Artifact details strip ─────────────────────────────── -->
-    <div class="details-strip">
+    <dl class="details-strip">
       <div class="detail-item">
-        <span class="dl">Release</span>
-        <span class="dv">{product.release || '—'}</span>
+        <dt class="mc-label">Release</dt>
+        <dd>{product.release || '—'}</dd>
       </div>
       <div class="detail-item">
-        <span class="dl">Version</span>
-        <span class="dv mono">{showHistory ? (viewedArtefact?.version ?? product.version ?? '—') : (product.version ?? '—')}</span>
+        <dt class="mc-label">Version</dt>
+        <dd class="mono">{showHistory
+          ? (viewedArtefact?.version ?? product.version ?? '—')
+          : (product.version ?? '—')}</dd>
       </div>
       <div class="detail-item">
-        <span class="dl">Architecture</span>
-        <span class="dv">{product.arch || '—'}</span>
+        <dt class="mc-label">Architecture</dt>
+        <dd>{product.arch || '—'}</dd>
       </div>
       <div class="detail-item">
-        <span class="dl">Type</span>
-        <span class="dv">{product.type || '—'}</span>
+        <dt class="mc-label">Type</dt>
+        <dd>{product.type || '—'}</dd>
       </div>
       {#if product.bugs.length > 0}
         <div class="detail-item full">
-          <span class="dl">Bugs</span>
-          <span class="dv">
+          <dt class="mc-label">Bugs</dt>
+          <dd>
             {#each product.bugs as bug}
-              <a href="https://launchpad.net/bugs/{bug}">
-                <span class="bug-tag">LP#{bug}</span>
-              </a>
+              <a class="mono" href="https://launchpad.net/bugs/{bug}">LP#{bug}</a>
             {/each}
-          </span>
+          </dd>
         </div>
       {/if}
-    </div>
+    </dl>
 
     <!-- ── Latest builds (minimal one-liner per build) ──────────── -->
     {#if !showHistory && !loading && !error && builds.length > 0}
       <div class="builds-strip">
-        <span class="builds-label">Latest</span>
+        <span class="mc-label">Latest</span>
         {#each builds as build, bi}
           {@const folderLink = getBuildFolderLink(build)}
           <div class="build-line">
-            {#if builds.length > 1}<span class="build-num">#{bi + 1}</span>{/if}
-            {#if build.architecture}<span class="build-arch">{build.architecture}</span>{/if}
-            {#if build.revision}<span class="build-rev">{build.revision}</span>{/if}
+            {#if builds.length > 1}<strong>#{bi + 1}</strong>{/if}
+            {#if build.architecture}<span class="mono">{build.architecture}</span>{/if}
+            {#if build.revision}
+              <span class="mono u-text--muted">{build.revision}</span>
+            {/if}
             {#if folderLink}
-              <a class="build-link" href={folderLink} target="_blank" rel="noopener noreferrer">↗ source</a>
+              <a href={folderLink} target="_blank" rel="noopener noreferrer">Source ↗</a>
             {/if}
           </div>
         {/each}
@@ -183,274 +207,138 @@
     {/if}
 
     <!-- ── Test detail + 30-day history ──────────────────────────── -->
-    <div class="history-wrap">
-      <HistoryPanel {product} showCalendar={showHistory} onArtefactChange={(a) => viewedArtefact = a} />
-    </div>
+    <HistoryPanel
+      {product}
+      showCalendar={showHistory}
+      onArtefactChange={(a) => viewedArtefact = a}
+    />
 
-  </div>
+  </section>
 </div>
 
 <style>
-  .backdrop {
-    position: fixed;
-    inset: 0;
-    background: rgba(0, 0, 0, 0.65);
-    backdrop-filter: blur(3px);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    z-index: 100;
-    padding: 1rem;
-  }
-
-  .modal {
-    width: 100%;
-    max-width: 1232px;
+  .product-modal {
+    border-top: 4px solid var(--vf-color-border-high-contrast);
     max-height: 88vh;
-    display: flex;
-    flex-direction: column;
-    border-radius: 11px;
-    border: 1px solid var(--border-subtle);
-    background: var(--bg-panel);
-    overflow: hidden;
-    box-shadow: 0 20px 60px rgba(0,0,0,0.6);
+    max-width: 77rem;
+    width: 100%;
   }
+  .product-modal.tone-positive { border-top-color: var(--mc-positive); }
+  .product-modal.tone-negative { border-top-color: var(--mc-negative); }
 
   /* ── Header ───────────────────────────────────────────────── */
-  .modal-header {
-    display: flex;
-    align-items: flex-start;
-    justify-content: space-between;
-    gap: 1.54rem;
-    padding: 1.32rem 1.54rem;
-    border-bottom: 1px solid rgba(255,255,255,0.06);
-    flex-shrink: 0;
+  .p-modal__header {
+    align-items: center;
+    gap: 1.5rem;
+    padding-bottom: 1rem;
   }
 
-  .modal-header.approved { background: var(--green-bg);  border-bottom-color: var(--green-border); }
-  .modal-header.failed   { background: var(--red-bg);    border-bottom-color: var(--red-border); }
-  .modal-header.neutral  { background: var(--bg-base);   border-bottom-color: var(--border-subtle); }
-
-  .header-left  { display: flex; flex-direction: row; align-items: center; gap: 0.88rem; min-width: 0; }
+  .header-left {
+    align-items: center;
+    display: flex;
+    gap: 1rem;
+    min-width: 0;
+  }
 
   .header-flavor-icon {
-    width: 42px;
-    height: 42px;
-    object-fit: contain;
     flex-shrink: 0;
+    height: 2.5rem;
+    object-fit: contain;
+    width: 2.5rem;
   }
 
-  .header-left-text { display: flex; flex-direction: column; gap: 0.31rem; min-width: 0; }
-  .header-right { display: flex; align-items: center; gap: 0.77rem; flex-shrink: 0; }
+  .header-left-text {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+  }
 
   .modal-name {
-    font-size: 1.41rem;
-    font-weight: 700;
-    color: var(--text-bright);
-    display: flex;
     align-items: center;
-    gap: 0.62rem;
+    display: flex;
+    gap: 0.75rem;
+    margin: 0;
+    padding: 0;
     white-space: nowrap;
-    overflow: hidden;
   }
-
-  .ext-link {
-    font-size: 1.06rem;
-    font-weight: 400;
-    color: var(--accent);
-    text-decoration: none;
-    opacity: 0.7;
-    flex-shrink: 0;
-    transition: opacity 0.15s;
-  }
-  .ext-link:hover { opacity: 1; }
 
   .os-tag {
-    font-size: 1rem;
-    font-weight: 700;
-    letter-spacing: 0.04em;
-    text-transform: uppercase;
-    color: var(--accent);
-    background: rgba(255,255,255,0.07);
-    padding: 0.15em 0.5em;
-    border-radius: 4px;
-    white-space: nowrap;
+    color: var(--mc-brand);
     flex-shrink: 0;
+    text-transform: uppercase;
   }
 
   .modal-sub {
-    font-size: 1.06rem;
-    color: var(--text-dim);
-    display: flex;
     align-items: center;
-    gap: 0.62rem;
-  }
-
-  .mandatory-tag {
-    color: var(--accent);
-    font-size: 1rem;
-    font-weight: 700;
-  }
-
-  .hbadge {
-    display: inline-block;
-    padding: 0.15em 0.55em;
-    border-radius: 4px;
-    font-size: 1rem;
-    font-weight: 700;
-    letter-spacing: 0.04em;
-    text-transform: uppercase;
-    background: var(--bg-raised);
-    color: var(--text-dim);
-  }
-  .hbadge.approved { background: var(--green-border); color: #5ddb5d; }
-  .hbadge.failed   { background: var(--red-border);   color: var(--red); }
-  .hbadge.neutral  { background: transparent;         color: var(--text-muted); }
-
-  .age-chip {
-    font-size: 1rem;
-    font-family: monospace;
-    font-weight: 700;
-    color: var(--text-muted);
-  }
-
-  .close-btn {
-    background: none;
-    border: none;
-    color: var(--text-dim);
-    font-size: 1.32rem;
-    cursor: pointer;
-    padding: 0.22rem 0.44rem;
-    border-radius: 4px;
-    line-height: 1;
-    transition: color 0.15s, background 0.15s;
-  }
-  .close-btn:hover { color: var(--text-bright); background: var(--surface-hover); }
-
-  /* ── View toggle nav ──────────────────────────────────────── */
-  .view-nav {
     display: flex;
+    gap: 0.75rem;
+  }
+
+  .modal-sub .p-chip {
+    margin: 0;
+  }
+
+  .header-right {
     align-items: center;
-    gap: 0.5rem;
-    padding: 0.55rem 1.54rem;
-    border-bottom: 1px solid rgba(255,255,255,0.05);
-    background: var(--bg-base);
+    display: flex;
     flex-shrink: 0;
+    gap: 1rem;
+    white-space: nowrap;
   }
 
-  .vnav-btn {
-    background: none;
-    border: none;
-    cursor: pointer;
-    font-size: 0.85rem;
-    font-weight: 700;
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
-    color: var(--text-dim);
-    padding: 0.25em 0.55em;
-    border-radius: 4px;
-    transition: color 0.15s, background 0.15s;
+  /* ── View toggle ──────────────────────────────────────────── */
+  .view-nav {
+    margin-bottom: 0.75rem;
   }
-  .vnav-btn:hover { color: var(--text-normal); background: var(--surface-hover); }
-  .vnav-btn.active { color: var(--accent); background: rgba(255,255,255,0.05); }
 
-  .vnav-sep {
-    color: var(--border-mid);
-    font-size: 0.9rem;
-    user-select: none;
+  .view-nav button {
+    margin-bottom: 0;
   }
 
   /* ── Details strip ────────────────────────────────────────── */
   .details-strip {
+    border-bottom: 1px solid var(--vf-color-border-low-contrast);
     display: flex;
     flex-wrap: wrap;
-    gap: 0.77rem 2.2rem;
-    padding: 0.77rem 1.54rem;
-    border-bottom: 1px solid rgba(255,255,255,0.05);
-    flex-shrink: 0;
+    gap: 0.5rem 2rem;
+    margin: 0;
+    padding-bottom: 0.75rem;
   }
 
   .detail-item {
-    display: flex;
     align-items: baseline;
-    gap: 0.53rem;
+    display: flex;
+    gap: 0.5rem;
   }
   .detail-item.full { flex-basis: 100%; }
 
-  .dl {
-    font-size: 0.82rem;
-    font-weight: 700;
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
-    color: var(--text-dim);
+  .detail-item dt,
+  .detail-item dd {
+    margin: 0;
+    padding: 0;
   }
-  .dv {
-    font-size: 1rem;
-    color: var(--text-normal);
+
+  .detail-item dd {
     display: flex;
-    align-items: center;
-    gap: 0.39rem;
     flex-wrap: wrap;
+    gap: 0.5rem;
   }
 
   /* ── Latest builds strip ──────────────────────────────────── */
   .builds-strip {
-    display: flex;
     align-items: center;
+    border-bottom: 1px solid var(--vf-color-border-low-contrast);
+    display: flex;
     flex-wrap: wrap;
-    gap: 0.4rem 1.1rem;
-    padding: 0.55rem 1.54rem;
-    border-bottom: 1px solid rgba(255,255,255,0.05);
-    flex-shrink: 0;
-    background: var(--surface-faint);
-  }
-
-  .builds-label {
-    font-size: 0.78rem;
-    font-weight: 700;
-    letter-spacing: 0.07em;
-    text-transform: uppercase;
-    color: var(--text-dim);
-    margin-right: 0.3rem;
+    gap: 0.5rem 1rem;
+    padding: 0.5rem 0;
   }
 
   .build-line {
-    display: flex;
     align-items: center;
-    gap: 0.45rem;
-    font-size: 0.97rem;
-    color: var(--text-muted);
+    display: flex;
+    gap: 0.5rem;
   }
 
-  .build-num  { font-weight: 700; color: var(--text-dim); }
-  .build-arch { font-family: monospace; color: var(--text-soft); }
-  .build-rev  { font-family: monospace; font-size: 0.88rem; color: var(--text-dim); }
-
-  .build-link {
-    font-size: 0.9rem;
-    color: var(--accent);
-    text-decoration: none;
-    opacity: 0.75;
-    transition: opacity 0.15s;
-  }
-  .build-link:hover { opacity: 1; }
-
-  /* ── History wrap (fills remaining space, scrollable) ─────── */
-  .history-wrap {
-    overflow-y: auto;
-    flex: 1;
-  }
-
-  /* ── Shared tags ──────────────────────────────────────────── */
-  .bug-tag {
-    background: #2d1a00;
-    color: #cc7700;
-    border: 1px solid #5a3500;
-    padding: 0.1em 0.4em;
-    border-radius: 4px;
-    font-size: 1rem;
-    font-family: monospace;
-  }
-
-  .mono { font-family: monospace; }
+  .mono { font-family: var(--mc-font-mono); }
 </style>

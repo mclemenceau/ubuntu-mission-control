@@ -324,6 +324,8 @@
     {countdown}
     isLoading={loadPhase !== null}
     productCount={products.length}
+    {activePage}
+    onPageChange={p => activePage = p}
     notifCount={unreadCount}
     {searchFilter}
     onSearchChange={v => searchFilter = v}
@@ -360,47 +362,38 @@
     <ProductModal product={selectedProduct} onclose={() => selectedProduct = null} />
   {/if}
 
-  {#if kpis && activePage === 'artifacts'}
-    <KpiRow {kpis} deltas={kpiDeltas} onBugsClick={openBugsPanel} onTestsClick={openTestSnapshot} />
-  {/if}
-
-  <!-- Page navigation tabs -->
-  <nav class="page-nav">
-    <button
-      class="nav-tab"
-      class:active={activePage === 'artifacts'}
-      onclick={() => activePage = 'artifacts'}
-    >⬡ Artifacts</button>
-    <button
-      class="nav-tab"
-      class:active={activePage === 'testing'}
-      onclick={() => activePage = 'testing'}
-    >✓ Testing</button>
-  </nav>
-
   {#if activePage === 'artifacts'}
-    <div class="grid-wrap">
+    {#if kpis}
+      <KpiRow {kpis} deltas={kpiDeltas} onBugsClick={openBugsPanel} onTestsClick={openTestSnapshot} />
+    {/if}
+
+    <main class="grid-wrap">
       {#if loadPhase === 'initial'}
         <!-- Initial load overlay — not shown during background refresh -->
         <div class="loading-screen">
-          <div class="loading-box">
-            <div class="loading-title">Loading Data</div>
-            <div class="loading-label">{loadLabel}</div>
-            <div class="loading-track">
-              <div class="loading-fill" style="width: {loadPct}%"></div>
+          <div class="mc-surface loading-box">
+            <h2 class="mc-label">Loading data</h2>
+            <p class="u-text--muted">{loadLabel}</p>
+            <div class="mc-progress" style="--mc-bar: var(--mc-brand)">
+              <span style="width: {loadPct}%"></span>
             </div>
           </div>
         </div>
       {:else if loadError}
-        <div class="error-msg">Error: {loadError}</div>
+        <div class="p-notification--negative">
+          <div class="p-notification__content">
+            <h5 class="p-notification__title">Error</h5>
+            <p class="p-notification__message">{loadError}</p>
+          </div>
+        </div>
       {:else}
         <ProductGrid products={filteredProducts} onSelectProduct={p => selectedProduct = p} />
       {/if}
-    </div>
+    </main>
   {:else}
-    <div class="testing-wrap">
+    <main class="testing-wrap">
       <TestingPage {releases} {selectedRelease} />
-    </div>
+    </main>
   {/if}
 </div>
 
@@ -410,104 +403,41 @@
     flex-direction: column;
     height: 100vh;
     overflow: hidden;
-    background: var(--bg-base);
   }
 
   .grid-wrap {
     flex: 1;
-    overflow-y: auto;
     overflow-x: hidden;
-    padding: 0.75rem 1rem;
+    overflow-y: auto;
+    padding: 1rem 1.5rem;
   }
 
   .testing-wrap {
     flex: 1;
-    overflow-y: auto;
     overflow-x: hidden;
-  }
-
-  /* ── Page navigation tabs ────────────────────────────────── */
-  .page-nav {
-    display: flex;
-    gap: 0;
-    background: var(--bg-panel);
-    border-bottom: 1px solid var(--border-mid);
-    padding: 0 1rem;
-    flex-shrink: 0;
-  }
-
-  .nav-tab {
-    background: none;
-    border: none;
-    border-bottom: 2px solid transparent;
-    color: var(--text-dim);
-    font-family: inherit;
-    font-size: 0.82rem;
-    font-weight: 600;
-    letter-spacing: 0.05em;
-    text-transform: uppercase;
-    padding: 0.55rem 1rem;
-    cursor: pointer;
-    margin-bottom: -1px;
-    transition: color 0.15s, border-color 0.15s;
-  }
-  .nav-tab:hover { color: var(--text); }
-  .nav-tab.active {
-    color: var(--accent);
-    border-bottom-color: var(--accent);
+    overflow-y: auto;
   }
 
   /* Initial load screen */
   .loading-screen {
-    display: flex;
     align-items: center;
-    justify-content: center;
+    display: flex;
     height: 100%;
+    justify-content: center;
   }
 
   .loading-box {
-    background: var(--bg-panel);
-    border: 1px solid #333;
-    border-radius: 6px;
+    min-width: 20rem;
     padding: 2rem 3rem;
     text-align: center;
-    min-width: 320px;
   }
 
-  .loading-title {
-    font-size: 0.75rem;
-    font-weight: 700;
-    letter-spacing: 0.1em;
-    text-transform: uppercase;
-    color: var(--accent);
+  .loading-box .mc-label {
     margin-bottom: 1rem;
   }
 
-  .loading-label {
-    font-size: 0.875rem;
-    color: var(--text-muted);
+  .loading-box p {
     margin-bottom: 0.75rem;
-    min-height: 1.25em;
+    min-height: 1.5rem;
   }
-
-  .loading-track {
-    height: 4px;
-    background: var(--bg-raised);
-    border-radius: 2px;
-    overflow: hidden;
-  }
-
-  .loading-fill {
-    height: 100%;
-    background: var(--accent);
-    border-radius: 2px;
-    transition: width 0.3s ease;
-  }
-
-  .error-msg {
-    color: var(--red);
-    padding: 1rem 1.5rem;
-    font-size: 0.875rem;
-  }
-
 </style>

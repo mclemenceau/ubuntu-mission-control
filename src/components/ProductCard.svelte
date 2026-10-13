@@ -84,7 +84,7 @@
   <div class="chip-top">
     <span class="chip-name">{product.displayName}</span>
     {#if statusIcon}
-      <span class="chip-icon {cardClass}">{statusIcon}</span>
+      <span class="chip-icon">{statusIcon}</span>
     {/if}
     <img class="flavor-icon" src={flavorIcon} alt="" aria-hidden="true" />
   </div>
@@ -95,10 +95,10 @@
   <div class="chip-bottom">
     <span class="chip-version">{product.version}</span>
     {#if hasTests}
-      {#if product.tests.passed}    <span class="tc pass">✓{product.tests.passed}</span>{/if}
-      {#if product.tests.failed}    <span class="tc fail">✗{product.tests.failed}</span>{/if}
-      {#if product.tests.inProgress}<span class="tc prog">●{product.tests.inProgress}</span>{/if}
-      {#if product.tests.notStarted}<span class="tc skip">○{product.tests.notStarted}</span>{/if}
+      {#if product.tests.passed}    <span class="tc mc-text--positive">✓{product.tests.passed}</span>{/if}
+      {#if product.tests.failed}    <span class="tc mc-text--negative">✗{product.tests.failed}</span>{/if}
+      {#if product.tests.inProgress}<span class="tc mc-text--information">●{product.tests.inProgress}</span>{/if}
+      {#if product.tests.notStarted}<span class="tc u-text--muted">○{product.tests.notStarted}</span>{/if}
     {/if}
   </div>
   {#if isStale && product.ageDays !== null}
@@ -108,93 +108,86 @@
 
 <style>
   .chip {
-    position: relative;
+    background: var(--vf-color-background-default);
+    border: 1px solid var(--vf-color-border-low-contrast);
+    border-left: 4px solid var(--vf-color-border-high-contrast);
+    border-radius: 0;
+    color: var(--vf-color-text-default);
     display: flex;
     flex-direction: column;
+    height: 5.5rem;
     justify-content: space-between;
-    min-width: 20em;
-    height: 5.5em;
+    margin: 0;
+    min-width: 20rem;
     padding: 0.5rem 0.875rem 0.5rem 1rem;
-    border-radius: 7px;
-    border: 1px solid var(--border-subtle);
-    border-left: 4px solid var(--border-mid);
-    background: var(--bg-panel);
-    cursor: pointer;
+    position: relative;
     text-align: left;
-    font-family: inherit;
-    transition: filter 0.12s, transform 0.12s, box-shadow 0.12s;
+    transition: transform 0.12s, box-shadow 0.12s, background-color 0.12s;
   }
 
   .chip:hover {
-    filter: brightness(1.25);
+    background-color: var(--vf-color-background-hover);
+    box-shadow: 0 2px 8px var(--mc-shadow);
     transform: translateY(-1px);
-    box-shadow: 0 3px 10px rgba(0,0,0,0.4);
   }
-
-  .chip:focus {
-    outline: 2px solid var(--accent);
-    outline-offset: 2px;
-  }
-  .chip:focus:not(:focus-visible) { outline: none; }
 
   .chip.approved {
-    background: var(--green-bg);
-    border-color: var(--green-border);
-    border-left-color: var(--green);
+    background: var(--vf-color-background-positive-default);
+    border-color: var(--vf-color-border-positive);
+    border-left-color: var(--mc-positive);
   }
+  .chip.approved:hover { background: var(--vf-color-background-positive-hover); }
+
   .chip.failed {
-    background: var(--red-bg);
-    border-color: var(--red-border);
-    border-left-color: var(--red);
+    background: var(--vf-color-background-negative-default);
+    border-color: var(--vf-color-border-negative);
+    border-left-color: var(--mc-negative);
   }
-  .chip.default  { border-left-color: var(--border-mid); }
+  .chip.failed:hover { background: var(--vf-color-background-negative-hover); }
 
   .flavor-icon {
-    width: 20px;
-    height: 20px;
-    object-fit: contain;
     flex-shrink: 0;
+    height: 1.25rem;
+    object-fit: contain;
+    width: 1.25rem;
   }
 
   /* ── Top row: name + status icon ─── */
   .chip-top {
-    display: flex;
-    justify-content: space-between;
     align-items: center;
-    gap: 0.44rem;
+    display: flex;
+    gap: 0.5rem;
+    justify-content: space-between;
     overflow: hidden;
   }
 
   .chip-name {
-    font-size: 1.2rem;
-    font-weight: 700;
-    color: var(--text-bright);
-    white-space: nowrap;
+    flex: 1;
+    font-size: 1.125rem;
+    font-weight: 550;
     overflow: hidden;
     text-overflow: ellipsis;
-    flex: 1;
+    white-space: nowrap;
   }
 
   .chip-icon {
-    font-size: 1.1rem;
-    font-weight: 700;
     flex-shrink: 0;
+    font-weight: 700;
   }
-  .chip-icon.approved { color: var(--green); }
-  .chip-icon.failed   { color: var(--red);   }
+  .approved .chip-icon { color: var(--mc-positive); }
+  .failed .chip-icon   { color: var(--mc-negative); }
 
-  /* ── Bottom row: arch + test counts ─── */
+  /* ── Middle + bottom rows: arch/type, version + test counts ─── */
   .chip-bottom {
-    display: flex;
     align-items: center;
-    gap: 0.38rem;
+    display: flex;
+    gap: 0.375rem;
   }
 
   .chip-middle, .chip-version {
-    font-size: 1rem;
-    color: var(--text-dim);
+    color: var(--vf-color-text-muted);
     flex-shrink: 0;
-    margin-right: 0.18rem;
+    margin-right: 0.25rem;
   }
 
   .chip-middle span + span:before {
@@ -202,37 +195,29 @@
   }
 
   .tc {
-    font-size: 0.98rem;
-    font-weight: 700;
-    padding: 0.05em 0.25em;
-    border-radius: 3px;
-    line-height: 1;
+    font-variant-numeric: tabular-nums;
+    font-weight: 550;
   }
-  .tc.pass { color: #5ddb5d; }
-  .tc.fail { color: var(--red); }
-  .tc.prog { color: var(--blue); }
-  .tc.skip { color: var(--text-dim); }
 
   .age-badge {
-    position: absolute;
-    bottom: 0.3rem;
-    right: 0.45rem;
-    font-size: 0.78rem;
+    bottom: 0.25rem;
+    font-family: var(--mc-font-mono);
+    font-size: 0.75rem;
     font-weight: 700;
-    font-family: monospace;
     line-height: 1;
     pointer-events: none;
+    position: absolute;
+    right: 0.5rem;
   }
 
   /* Change glow-flash overlay — fades out over 15 s */
   .glow-ring {
-    position: absolute;
-    inset: -1px;
-    border-radius: 7px;
-    pointer-events: none;
+    animation: glow-fade 15s ease-out forwards;
     box-shadow: 0 0 0 3px rgba(var(--glow-rgb), 0.85),
                 0 0 18px 4px rgba(var(--glow-rgb), 0.5);
-    animation: glow-fade 15s ease-out forwards;
+    inset: -1px;
+    pointer-events: none;
+    position: absolute;
     z-index: 2;
   }
 

@@ -66,14 +66,14 @@ export function artifactTypeLabel(name, release) {
 }
 
 /**
- * Returns a color class name ('green' | 'amber' | 'red' | 'neutral')
+ * Returns a Vanilla tone ('positive' | 'caution' | 'negative' | 'neutral')
  * based on a 0-100 percentage value.
  */
 export function pctColor(pct) {
   if (pct === null || pct === undefined) return 'neutral'
-  if (pct >= 80) return 'green'
-  if (pct >= 50) return 'amber'
-  return 'red'
+  if (pct >= 80) return 'positive'
+  if (pct >= 50) return 'caution'
+  return 'negative'
 }
 
 /** Formats seconds as M:SS */

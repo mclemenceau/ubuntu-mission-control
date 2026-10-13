@@ -1,6 +1,14 @@
 <script>
   import { onMount } from 'svelte'
   import { fetchArtefact, fetchArtefactVersions, fetchBuilds, fetchTestResults } from '../api/client.js'
+  import {
+    countEffective,
+    execSlot,
+    latestExecutions,
+    recentRuns,
+    resolveResults,
+  } from '../lib/testResults.js'
+  import RunDots from './RunDots.svelte'
 
   /** @type {{ product: import('../lib/processor.js').Product, showCalendar?: boolean, onArtefactChange?: (a: any) => void }} */
   let { product, showCalendar = true, onArtefactChange = null } = $props()
@@ -16,54 +24,49 @@
   let historyError   = $state(null)
 
   const STATUS_LABELS = {
-    APPROVED:         '✓ Approved',
-    MARKED_AS_FAILED: '✗ Failed',
-    UNDECIDED:        '? Undecided',
+    APPROVED:         'Approved',
+    MARKED_AS_FAILED: 'Failed',
+    UNDECIDED:        'Undecided',
   }
 
   // ── Helpers shared by both load paths ─────────────────────────────────
   async function loadDayTestData(day, rawBuilds) {
     const execs = rawBuilds
-      .flatMap(b => b.test_executions ?? [])
+      .flatMap(b => (b.test_executions ?? []).map(e => ({ ...e, buildId: b.id })))
       .filter(te => te.test_plan !== 'Image build')
 
-    let passed     = execs.filter(e => e.status === 'PASSED').length
-    let failed     = execs.filter(e => ['FAILED', 'ENDED_PREMATURELY'].includes(e.status)).length
-    let inProgress = execs.filter(e => e.status === 'IN_PROGRESS').length
-    let notStarted = execs.filter(e => ['NOT_STARTED', 'NOT_TESTED'].includes(e.status)).length
+    // Re-runs are superseded by the newest attempt per build/env/plan.
+    const latest = latestExecutions(execs)
+    let passed     = latest.filter(e => e.status === 'PASSED').length
+    let failed     = latest.filter(e => ['FAILED', 'ENDED_PREMATURELY'].includes(e.status)).length
+    let notStarted = latest.filter(e => ['NOT_STARTED', 'NOT_TESTED'].includes(e.status)).length
 
-    const inProgressIds = new Set(execs.filter(e => e.status === 'IN_PROGRESS').map(e => e.id))
-    const execResults = new Map()
-    let resultPassed = 0, resultFailed = 0
-    const execsWithResults = new Set()
-    await Promise.all(
-      execs.map(async exec => {
-        const results = await fetchTestResults(exec.id).catch(() => [])
-        execResults.set(exec.id, results)
-        if (results.length > 0) {
-          if (inProgressIds.has(exec.id)) execsWithResults.add(exec.id)
-          for (const r of results) {
-            if (r.status === 'PASSED')      resultPassed++
-            else if (r.status === 'FAILED') resultFailed++
-          }
-        }
-      }),
+    const execResults = await Promise.all(
+      execs.map(async exec => ({
+        exec,
+        buildId: exec.buildId,
+        results: await fetchTestResults(exec.id).catch(() => []),
+      })),
     )
-    if (resultPassed + resultFailed > 0) {
-      passed     = resultPassed
-      failed     = resultFailed
-      inProgress = Math.max(0, inProgress - execsWithResults.size)
+    const counts = countEffective(resolveResults(execResults).effective)
+    if (counts.passed + counts.failed > 0) {
+      passed = counts.passed
+      failed = counts.failed
     }
-    // Suppress IN_PROGRESS with no results - not actionable signal.
-    inProgress = 0
+    // IN_PROGRESS executions are not actionable signal - not shown.
+    day.tests = { passed, failed, inProgress: 0, notStarted }
 
-    day.tests = { passed, failed, inProgress, notStarted }
+    const resultsById = new Map(execResults.map(x => [x.exec.id, x.results]))
     day.builds = rawBuilds
       .map(b => ({
         ...b,
         test_executions: (b.test_executions ?? [])
           .filter(te => te.test_plan !== 'Image build')
-          .map(exec => ({ ...exec, results: execResults.get(exec.id) ?? [] })),
+          .map(exec => ({
+            ...exec,
+            buildId: b.id,
+            results: resultsById.get(exec.id) ?? [],
+          })),
       }))
       .filter(b => b.test_executions.length > 0)
   }
@@ -215,7 +218,9 @@
 
   let ratePct = $derived(rate ? Math.round((rate.built / rate.total) * 100) : 0)
   let rateColor = $derived(
-    ratePct >= 70 ? '#4caf50' : ratePct >= 40 ? '#ff9800' : '#e53935',
+    ratePct >= 70 ? 'var(--mc-positive)'
+    : ratePct >= 40 ? 'var(--mc-caution)'
+    : 'var(--mc-negative)',
   )
 
   // Currently selected day object
@@ -228,17 +233,22 @@
 
   /**
    * Group all test executions from a set of builds by environment name,
-   * then flatten their results into a single row list per group.
+   * collapse re-runs to the latest attempt of each test, and flatten the
+   * effective results into a single row list per group.
    *
    * Each group: { envName, status, rows[], multiplePlans }
-   *   rows: { tester, testName, plan, status, comment }
+   *   rows: { tester, testName, plan, status, comment, runs, noResults }
+   *     runs: recent runs of the test for the RunDots strip
    *   multiplePlans: true when >1 distinct test_plan in the group
    *     (drives whether the "Test Plan" column is shown)
+   *
+   * A job (build, env, plan) whose latest attempt has no results and
+   * no earlier attempt with results gets a single "no results" row.
    *
    * Group status is the worst status across all executions:
    *   FAILED > IN_PROGRESS > NOT_STARTED > PASSED
    */
-  function groupExecsByEnv(builds) {
+  function groupExecsByEnv(builds, artefact) {
     const groups = new Map()
     for (const build of builds) {
       for (const exec of build.test_executions) {
@@ -255,20 +265,16 @@
       const plans = new Set(execs.map(e => e.test_plan).filter(Boolean))
       const multiplePlans = plans.size > 1
 
-      const rows = execs.flatMap(exec => {
-        const effStatus = effectiveExecStatus(exec)
-        const endedPrematurely = exec.status === 'ENDED_PREMATURELY'
-        if (exec.results.length === 0) {
-          return [{
-            tester: null,
-            testName: null,
-            plan: exec.test_plan ?? null,
-            status: effStatus,
-            comment: null,
-            noResults: true,
-          }]
-        }
-        return exec.results.map(r => {
+      const { effective } = resolveResults(
+        execs.map(exec => ({ exec, buildId: exec.buildId, results: exec.results })),
+      )
+      const slotsWithResults = new Set(
+        effective.map(e => execSlot(e.exec, e.buildId)),
+      )
+      const latest = latestExecutions(execs)
+
+      const rows = [
+        ...effective.map(({ exec, result: r }) => {
           const { tester, testName } = parseResultName(r.name)
           return {
             tester,
@@ -276,12 +282,24 @@
             plan: exec.test_plan ?? null,
             // If the execution was cut short, surface that on the row
             // rather than whatever partial result status was recorded.
-            status: endedPrematurely ? 'ENDED_PREMATURELY' : r.status,
+            status: exec.status === 'ENDED_PREMATURELY' ? 'ENDED_PREMATURELY' : r.status,
             comment: r.comment ?? null,
+            runs: recentRuns(r, artefact?.version),
             noResults: false,
           }
-        })
-      })
+        }),
+        ...latest
+          .filter(exec => !slotsWithResults.has(execSlot(exec, exec.buildId)))
+          .map(exec => ({
+            tester: null,
+            testName: null,
+            plan: exec.test_plan ?? null,
+            status: effectiveExecStatus(exec),
+            comment: null,
+            runs: [],
+            noResults: true,
+          })),
+      ]
 
       // Group status derived from result rows where available,
       // falling back to exec-level status only when no results exist.
@@ -295,7 +313,7 @@
         else if (statuses.every(s => s === 'SKIPPED')) groupStatus = 'SKIPPED'
         else                                           groupStatus = 'IN_PROGRESS'
       } else {
-        groupStatus = execs.reduce((worst, exec) => {
+        groupStatus = latest.reduce((worst, exec) => {
           const s = effectiveExecStatus(exec)
           return (STATUS_RANK[s] ?? 99) < (STATUS_RANK[worst] ?? 99) ? s : worst
         }, 'PASSED')
@@ -312,11 +330,16 @@
     return { tester: name.slice(0, idx), testName: name.slice(idx + 3) }
   }
 
-  function execStatusClass(status) {
-    if (status === 'PASSED')                                   return 'exec-passed'
-    if (['FAILED', 'ENDED_PREMATURELY'].includes(status))     return 'exec-failed'
-    if (status === 'IN_PROGRESS')                              return 'exec-progress'
-    return 'exec-pending'
+  /** Vanilla p-status-label class for a tone ('' = neutral). */
+  function statusLabel(tone) {
+    return tone ? `p-status-label--${tone}` : 'p-status-label'
+  }
+
+  function execStatusTone(status) {
+    if (status === 'PASSED')                                   return 'positive'
+    if (['FAILED', 'ENDED_PREMATURELY'].includes(status))     return 'negative'
+    if (status === 'IN_PROGRESS')                              return 'information'
+    return ''
   }
 
   function resultStatusClass(status) {
@@ -325,11 +348,13 @@
     return 'res-other'
   }
 
-  function statusBadgeClass(status) {
-    if (status === 'APPROVED')          return 'badge-ok'
-    if (status === 'MARKED_AS_FAILED')  return 'badge-fail'
-    return 'badge-neutral'
+  function artefactStatusTone(status) {
+    if (status === 'APPROVED')          return 'positive'
+    if (status === 'MARKED_AS_FAILED')  return 'negative'
+    return ''
   }
+
+  const RESULT_TONES = { 'res-pass': 'positive', 'res-fail': 'negative' }
 
   /**
    * When a test execution is still IN_PROGRESS but all results have been submitted,
@@ -354,15 +379,15 @@
     {#if !loading && !error && rate}
       <div class="summary">
         <div class="summary-left">
-          <span class="summary-title">30-day build history</span>
-          <span class="summary-sub">{rate.built} of {rate.total} days built · {rate.approved} approved</span>
+          <span class="mc-label">30-day build history</span>
+          <span class="u-text--muted">{rate.built} of {rate.total} days built · {rate.approved} approved</span>
         </div>
         <div class="rate-wrap">
           <span class="rate-label" style="color: {rateColor}">{ratePct}%</span>
           <div class="rate-track">
             <div class="rate-fill" style="width: {ratePct}%; background: {rateColor}"></div>
           </div>
-          <span class="rate-desc">build rate</span>
+          <span class="u-text--muted">build rate</span>
         </div>
       </div>
     {/if}
@@ -388,13 +413,13 @@
               {#if tl}
                 {#each tl.split(' ') as chunk}
                   <span class="tl-chip"
-                        class:tl-pass={chunk.endsWith('✓')}
-                        class:tl-fail={chunk.endsWith('✗')}
-                        class:tl-prog={chunk.endsWith('…')}
+                        class:mc-text--positive={chunk.endsWith('✓')}
+                        class:mc-text--negative={chunk.endsWith('✗')}
+                        class:mc-text--information={chunk.endsWith('…')}
                   >{chunk}</span>
                 {/each}
               {:else if day.artefact}
-                <span class="tl-none">—</span>
+                <span class="u-text--muted">—</span>
               {/if}
             </div>
 
@@ -427,7 +452,7 @@
         <span class="leg-item"><span class="leg-swatch miss"></span>No build</span>
         <span class="leg-item"><span class="mark-ok leg-mark">✓</span>Approved</span>
         <span class="leg-item"><span class="mark-fail leg-mark">✗</span>Not approved</span>
-        <span class="leg-item leg-hint">Click a day to see its test results</span>
+        <span class="leg-item leg-hint u-text--muted">Click a day to see its test results</span>
       </div>
     {/if}
 
@@ -445,18 +470,34 @@
         <div class="detail-hdr-left">
           <span class="detail-date">{dayLabel(selDay.date)}{isToday(selDay.date) ? ' (today)' : ''}</span>
           <span class="detail-version">{selDay.artefact?.version ?? '—'}</span>
-          <span class="detail-status-badge {statusBadgeClass(selDay.artefact?.status)}">
+          <span class={statusLabel(artefactStatusTone(selDay.artefact?.status))}>
             {STATUS_LABELS[selDay.artefact?.status] ?? '—'}
           </span>
         </div>
         {#if selDay.tests}
           <div class="detail-counts">
-            {#if selDay.tests.passed}     <span class="chip chip-pass">✓ {selDay.tests.passed}</span>{/if}
-            {#if selDay.tests.failed}     <span class="chip chip-fail">✗ {selDay.tests.failed}</span>{/if}
-            {#if selDay.tests.inProgress} <span class="chip chip-prog">… {selDay.tests.inProgress}</span>{/if}
-            {#if selDay.tests.notStarted} <span class="chip chip-skip">○ {selDay.tests.notStarted}</span>{/if}
+            {#if selDay.tests.passed}
+              <span class="p-chip--positive is-dense is-readonly">
+                <span class="p-chip__value">✓ {selDay.tests.passed}</span>
+              </span>
+            {/if}
+            {#if selDay.tests.failed}
+              <span class="p-chip--negative is-dense is-readonly">
+                <span class="p-chip__value">✗ {selDay.tests.failed}</span>
+              </span>
+            {/if}
+            {#if selDay.tests.inProgress}
+              <span class="p-chip--information is-dense is-readonly">
+                <span class="p-chip__value">… {selDay.tests.inProgress}</span>
+              </span>
+            {/if}
+            {#if selDay.tests.notStarted}
+              <span class="p-chip is-dense is-readonly">
+                <span class="p-chip__value">○ {selDay.tests.notStarted}</span>
+              </span>
+            {/if}
             {#if selDay.tests.passed + selDay.tests.failed + selDay.tests.inProgress + selDay.tests.notStarted === 0}
-              <span class="chip-none">no executions</span>
+              <span class="u-text--muted">no executions</span>
             {/if}
           </div>
         {/if}
@@ -466,23 +507,26 @@
       {#if !selDay.builds || selDay.builds.length === 0}
         <div class="detail-empty">No test executions for this build.</div>
       {:else}
-        {#each groupExecsByEnv(selDay.builds) as group}
+        {#each groupExecsByEnv(selDay.builds, selDay.artefact) as group}
           <div class="det-env-group">
             <div class="det-env-hdr">
               <span>{group.envName}</span>
-              <span class="exec-badge {execStatusClass(group.status)}">{group.status ?? '—'}</span>
+              <span class={statusLabel(execStatusTone(group.status))}>
+                {group.status ?? '—'}
+              </span>
             </div>
 
             {#if group.rows.every(r => r.noResults)}
               <div class="det-no-results">No results submitted yet.</div>
             {:else}
-              <table class="det-table">
+              <table class="mc-table det-table">
                 <thead>
                   <tr>
                     {#if group.multiplePlans}<th>Test Plan</th>{/if}
                     <th>Tester</th>
                     <th>Test</th>
                     <th>Status</th>
+                    <th>Recent runs</th>
                     <th>Comment</th>
                   </tr>
                 </thead>
@@ -491,14 +535,19 @@
                     {#if r.noResults}
                       <tr class="res-other">
                         {#if group.multiplePlans}<td class="det-plan-col">{r.plan ?? '—'}</td>{/if}
-                        <td colspan="4" class="det-no-results-inline">No results submitted yet.</td>
+                        <td colspan="5" class="det-no-results-inline">No results submitted yet.</td>
                       </tr>
                     {:else}
                       <tr class={resultStatusClass(r.status)}>
                         {#if group.multiplePlans}<td class="det-plan-col">{r.plan ?? '—'}</td>{/if}
                         <td class="det-tester">{r.tester ?? '—'}</td>
                         <td class="det-name">{r.testName}</td>
-                        <td><span class="res-badge {resultStatusClass(r.status)}">{r.status ?? '—'}</span></td>
+                        <td>
+                          <span class={statusLabel(RESULT_TONES[resultStatusClass(r.status)])}>
+                            {r.status ?? '—'}
+                          </span>
+                        </td>
+                        <td class="det-runs"><RunDots runs={r.runs} /></td>
                         <td class="det-comment">{r.comment ?? ''}</td>
                       </tr>
                     {/if}
@@ -518,384 +567,268 @@
     display: flex;
     flex-direction: column;
     gap: 1rem;
-    padding: 1rem 1.54rem 1.25rem;
+    padding: 1rem 0 0.5rem;
+    --mc-built: color-mix(in srgb, var(--mc-positive) 30%, transparent);
+    --mc-miss: color-mix(in srgb, var(--mc-negative) 30%, transparent);
   }
 
   /* ── Summary ──────────────────────────────────────────────────── */
   .summary {
-    display: flex;
     align-items: center;
-    justify-content: space-between;
-    gap: 1.5rem;
+    display: flex;
     flex-wrap: wrap;
+    gap: 1.5rem;
+    justify-content: space-between;
   }
 
   .summary-left {
     display: flex;
     flex-direction: column;
-    gap: 0.2rem;
-  }
-
-  .summary-title {
-    font-size: 1rem;
-    font-weight: 700;
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
-    color: var(--text-dim);
-  }
-
-  .summary-sub {
-    font-size: 1rem;
-    color: var(--text-muted);
+    gap: 0.25rem;
   }
 
   .rate-wrap {
-    display: flex;
     align-items: center;
-    gap: 0.55rem;
+    display: flex;
+    gap: 0.5rem;
   }
 
   .rate-label {
-    font-size: 1.35rem;
-    font-weight: 700;
+    font-size: 1.5rem;
     font-variant-numeric: tabular-nums;
-    min-width: 3.2rem;
+    font-weight: 550;
+    min-width: 3.25rem;
     text-align: right;
   }
 
   .rate-track {
-    width: 110px;
-    height: 7px;
-    background: var(--bg-raised);
-    border-radius: 4px;
+    background: var(--vf-color-background-neutral-default);
+    height: 0.5rem;
     overflow: hidden;
+    width: 7rem;
   }
 
   .rate-fill {
     height: 100%;
-    border-radius: 4px;
     transition: width 0.4s ease;
-  }
-
-  .rate-desc {
-    font-size: 0.88rem;
-    color: var(--text-muted);
-    white-space: nowrap;
   }
 
   /* ── State message ────────────────────────────────────────────── */
   .hist-state {
-    font-size: 1.06rem;
-    color: var(--text-dim);
+    color: var(--vf-color-text-muted);
     padding: 1.25rem 0;
     text-align: center;
   }
-  .hist-state.err { color: var(--red); }
+  .hist-state.err { color: var(--mc-negative); }
 
   /* ── Day grid ─────────────────────────────────────────────────── */
   .day-grid {
     display: flex;
     gap: 3px;
+    overflow-x: auto;
+    padding: 0.25rem;
   }
 
   .day-col {
+    align-items: center;
     display: flex;
     flex-direction: column;
-    align-items: center;
-    gap: 3px;
     flex-shrink: 0;
-    width: 32px;
+    gap: 3px;
+    width: 2rem;
   }
 
-  /* Today: accent ring (blue) */
+  /* Today: brand ring */
   .day-col.today .day-block {
-    outline: 2px solid var(--accent);
+    outline: 2px solid var(--mc-brand);
     outline-offset: 1px;
   }
 
-  /* Selected: bright white ring, overrides today ring */
+  /* Selected: high-contrast ring, overrides today ring */
   .day-col.selected .day-block {
-    outline: 2px solid #fff;
+    outline: 2px solid var(--vf-color-text-default);
     outline-offset: 2px;
-    filter: brightness(1.35);
-  }
-
-  /* Both today and selected */
-  .day-col.today.selected .day-block {
-    outline: 2px solid #fff;
-    outline-offset: 2px;
-    filter: brightness(1.35);
   }
 
   /* Test metrics line */
   .test-line {
-    display: flex;
-    gap: 1px;
     align-items: center;
-    justify-content: center;
-    height: 14px;
-    font-size: 0.58rem;
-    font-weight: 700;
+    display: flex;
+    font-size: 0.625rem;
     font-variant-numeric: tabular-nums;
+    font-weight: 700;
+    gap: 1px;
+    height: 0.875rem;
+    justify-content: center;
   }
 
   .tl-chip {
-    padding: 0 1px;
-    border-radius: 2px;
     line-height: 1.3;
+    padding: 0 1px;
   }
-  .tl-pass { color: #5ddb5d; }
-  .tl-fail { color: var(--red); }
-  .tl-prog { color: var(--blue); }
-  .tl-none { color: var(--text-dim); font-size: 0.6rem; }
 
   /* Status block */
   .day-block {
-    width: 32px;
-    height: 38px;
-    padding: 0;
-    border: none;
-    border-radius: 4px;
-    display: flex;
     align-items: center;
-    justify-content: center;
-    font-family: inherit;
+    border: none;
+    border-radius: 0;
     color: inherit;
-    font-size: 0.95rem;
-    font-weight: 700;
-    transition: transform 0.1s, filter 0.1s;
     cursor: default;
+    display: flex;
+    font-weight: 700;
+    height: 2.375rem;
+    justify-content: center;
+    margin: 0;
+    padding: 0;
+    transition: transform 0.1s, filter 0.1s;
+    width: 2rem;
   }
   .day-block.clickable         { cursor: pointer; }
-  .day-block.clickable:hover   { transform: scaleY(1.08); filter: brightness(1.2); }
-  .day-block.clickable:focus-visible {
-    outline: 2px solid var(--accent);
-    outline-offset: 2px;
-  }
+  .day-block.clickable:hover   { transform: scaleY(1.08); }
 
-  .day-block.built { background: #1a4d1a; }
-  .day-block.miss  { background: #4d1a1a; }
+  .day-block.built { background: var(--mc-built); }
+  .day-block.miss  { background: var(--mc-miss); }
 
-  .day-mark { line-height: 1; font-size: 0.9rem; }
-  .mark-ok   { color: #5ddb5d; }
-  .mark-fail { color: var(--red); }
+  .day-mark { line-height: 1; }
+  .mark-ok   { color: var(--mc-positive); }
+  .mark-fail { color: var(--mc-negative); }
 
   /* Date label */
   .day-label {
-    font-size: 0.55rem;
-    color: var(--text-muted);
+    color: var(--vf-color-text-muted);
+    font-size: 0.5625rem;
+    line-height: 1.2;
     text-align: center;
     white-space: nowrap;
-    line-height: 1.2;
   }
 
   .today-label {
-    color: var(--accent);
+    color: var(--mc-brand);
     font-weight: 700;
   }
 
   /* ── Legend ───────────────────────────────────────────────────── */
   .legend {
-    display: flex;
-    gap: 1.25rem;
-    flex-wrap: wrap;
     align-items: center;
-    padding-top: 0.25rem;
+    display: flex;
+    flex-wrap: wrap;
+    font-size: 0.875rem;
+    gap: 1.25rem;
   }
 
   .leg-item {
-    display: flex;
     align-items: center;
-    gap: 0.35rem;
-    font-size: 0.82rem;
-    color: var(--text-muted);
+    display: flex;
+    gap: 0.375rem;
   }
 
   .leg-hint {
-    margin-left: auto;
     font-style: italic;
-    font-size: 0.78rem;
-    color: var(--text-dim);
+    margin-left: auto;
   }
 
   .leg-swatch {
-    width: 12px;
-    height: 12px;
-    border-radius: 3px;
     flex-shrink: 0;
+    height: 0.75rem;
+    width: 0.75rem;
   }
-  .leg-swatch.built { background: #1a4d1a; }
-  .leg-swatch.miss  { background: #4d1a1a; }
-  .leg-mark { font-size: 0.85rem; font-weight: 700; }
+  .leg-swatch.built { background: var(--mc-built); }
+  .leg-swatch.miss  { background: var(--mc-miss); }
+  .leg-mark { font-weight: 700; }
 
   /* ── Detail panel ─────────────────────────────────────────────── */
   .detail-panel {
-    border: 1px solid rgba(255,255,255,0.09);
-    border-radius: 8px;
-    overflow: hidden;
+    border: 1px solid var(--vf-color-border-low-contrast);
     display: flex;
     flex-direction: column;
   }
 
   .detail-hdr {
-    display: flex;
     align-items: center;
-    justify-content: space-between;
-    gap: 1rem;
-    padding: 0.7rem 1.1rem;
-    background: var(--surface-faint);
-    border-bottom: 1px solid rgba(255,255,255,0.06);
+    background: var(--vf-color-background-alt);
+    border-bottom: 1px solid var(--vf-color-border-low-contrast);
+    display: flex;
     flex-wrap: wrap;
+    gap: 1rem;
+    justify-content: space-between;
+    padding: 0.75rem 1rem;
   }
 
   .detail-hdr-left {
-    display: flex;
     align-items: center;
-    gap: 0.7rem;
+    display: flex;
+    gap: 0.75rem;
   }
 
   .detail-date {
-    font-size: 1rem;
-    font-weight: 700;
-    color: var(--text-bright);
+    font-weight: 550;
   }
 
   .detail-version {
-    font-size: 0.97rem;
-    font-family: monospace;
-    color: var(--text-dim);
+    color: var(--vf-color-text-muted);
+    font-family: var(--mc-font-mono);
   }
-
-  .detail-status-badge {
-    font-size: 0.82rem;
-    font-weight: 700;
-    letter-spacing: 0.04em;
-    text-transform: uppercase;
-    padding: 0.12em 0.5em;
-    border-radius: 4px;
-  }
-  .badge-ok      { background: var(--green-border); color: #5ddb5d; }
-  .badge-fail    { background: var(--red-border);   color: var(--red); }
-  .badge-neutral { background: var(--bg-raised);    color: var(--text-muted); }
 
   .detail-counts {
-    display: flex;
-    gap: 0.4rem;
-    flex-wrap: wrap;
     align-items: center;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
   }
 
-  .chip {
-    padding: 0.1em 0.4em;
-    border-radius: 3px;
-    font-size: 0.97rem;
-    font-weight: 700;
+  .detail-counts [class*='p-chip'] {
+    margin: 0;
   }
-  .chip-pass { background: #1a4d1a; color: #5ddb5d; }
-  .chip-fail { background: #4d1a1a; color: var(--red); }
-  .chip-prog { background: #1a2d4d; color: var(--blue); }
-  .chip-skip { background: #2a2a2a; color: var(--text-muted); }
-  .chip-none { font-size: 0.9rem; color: var(--text-dim); font-style: italic; }
 
   .detail-empty {
-    font-size: 1rem;
-    color: var(--text-dim);
+    color: var(--vf-color-text-muted);
     font-style: italic;
-    padding: 1rem 1.1rem;
+    padding: 1rem;
   }
 
   /* ── Execution blocks ─────────────────────────────────────────── */
-
-  /* Environment group - top-level section */
   .det-env-group {
-    border-top: 1px solid rgba(255,255,255,0.07);
+    border-top: 1px solid var(--vf-color-border-low-contrast);
   }
   .det-env-group:first-child { border-top: none; }
 
   .det-env-hdr {
-    display: flex;
     align-items: center;
+    background: var(--vf-color-background-neutral-default);
+    display: flex;
+    font-size: 0.875rem;
+    font-weight: 550;
+    gap: 0.75rem;
     justify-content: space-between;
-    gap: 0.7rem;
-    padding: 0.45rem 1.1rem;
-    font-size: 0.82rem;
-    font-weight: 700;
-    letter-spacing: 0.07em;
-    text-transform: uppercase;
-    color: var(--text-dim);
-    background: var(--surface-shade);
+    padding: 0.5rem 1rem;
   }
 
   .det-no-results {
-    font-size: 0.95rem;
-    color: var(--text-dim);
+    color: var(--vf-color-text-muted);
     font-style: italic;
-    padding: 0.55rem 1.1rem;
+    padding: 0.5rem 1rem;
   }
 
   .det-no-results-inline {
-    color: var(--text-dim);
+    color: var(--vf-color-text-muted);
     font-style: italic;
   }
 
   /* ── Results table ────────────────────────────────────────────── */
-  .det-table {
-    width: 100%;
-    border-collapse: collapse;
-    font-size: 1rem;
+  .det-table th:first-child,
+  .det-table td:first-child {
+    padding-left: 1rem;
   }
 
-  .det-table thead tr { background: rgba(0,0,0,0.2); }
-  .det-table th {
-    text-align: left;
-    padding: 0.35rem 1.1rem;
-    font-size: 0.82rem;
-    font-weight: 700;
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
-    color: var(--text-dim);
-    border-bottom: 1px solid var(--border-faint);
-  }
   .det-table td {
-    padding: 0.4rem 1.1rem;
     vertical-align: top;
-    border-bottom: 1px solid var(--border-subtle);
-    color: var(--text-soft);
   }
-  .det-table tr:last-child td { border-bottom: none; }
 
-  .det-plan-col { color: var(--text-muted); font-size: 0.95rem; white-space: nowrap; }
-  .res-pass td { background: rgba(0,60,0,0.15); }
-  .res-fail td { background: rgba(60,0,0,0.15); }
+  .det-plan-col { color: var(--vf-color-text-muted); white-space: nowrap; }
+  .res-pass td { background: var(--vf-color-background-positive-default); }
+  .res-fail td { background: var(--vf-color-background-negative-default); }
 
-  .det-tester  { color: var(--text-muted); white-space: nowrap; font-size: 0.95rem; }
-  .det-name    { color: var(--text-normal); }
-  .det-comment { color: var(--text-muted); font-style: italic; font-size: 0.95rem; }
-
-  /* ── Exec badge ───────────────────────────────────────────────── */
-  .exec-badge {
-    font-size: 0.82rem;
-    font-weight: 700;
-    padding: 0.1em 0.45em;
-    border-radius: 2px;
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
-    white-space: nowrap;
-  }
-  .exec-passed  { background: #1a4d1a; color: #5ddb5d; }
-  .exec-failed  { background: #4d1a1a; color: var(--red); }
-  .exec-progress{ background: #1a2d4d; color: var(--blue); }
-  .exec-pending { background: var(--bg-raised); color: var(--text-muted); }
-
-  /* ── Result badge ─────────────────────────────────────────────── */
-  .res-badge {
-    font-size: 0.82rem;
-    font-weight: 700;
-    padding: 0.1em 0.4em;
-    border-radius: 2px;
-    text-transform: uppercase;
-  }
-  .res-badge.res-pass  { background: #1a4d1a; color: #5ddb5d; }
-  .res-badge.res-fail  { background: #4d1a1a; color: var(--red); }
-  .res-badge.res-other { background: var(--bg-raised); color: var(--text-muted); }
+  .det-tester  { color: var(--vf-color-text-muted); white-space: nowrap; }
+  .det-runs { white-space: nowrap; }
+  .det-comment { color: var(--vf-color-text-muted); font-style: italic; }
 </style>
